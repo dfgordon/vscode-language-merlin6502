@@ -1,0 +1,1 @@
+A TextMate grammar for highlighting hovers could go here.

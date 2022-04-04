@@ -1,0 +1,993 @@
+{
+    "--^": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "end of loop",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "end of loop",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "adr": {
+        "alt": [],
+        "args": null,
+        "args16": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "brief": "define long address",
+        "category": "data storage",
+        "caveat": "Merlin 16",
+        "desc": "define 3 byte long address",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            16
+        ]
+    },
+    "adrl": {
+        "alt": [],
+        "args": null,
+        "args16": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "brief": "define long address",
+        "category": "data storage",
+        "caveat": "Merlin 16",
+        "desc": "define 4 byte long address",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            16
+        ]
+    },
+    "asc": {
+        "alt": [],
+        "args": "$._string_operand",
+        "args16": null,
+        "brief": "ascii text",
+        "category": "strings",
+        "caveat": "delimiter can be any character, \"sample\" negative ascii, 'sample' positive ascii",
+        "desc": "put delimited ascii text into object code",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "ast": {
+        "alt": [],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "asterisks",
+        "category": "formatting",
+        "caveat": null,
+        "desc": "print a line of asterisks",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "chk": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "checksum",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "put checksum in object code",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "cyc": {
+        "alt": [],
+        "args": "optional(choice('OFF','AVE'))",
+        "args16": "optional('FLAGS')",
+        "brief": "cycle time",
+        "category": "formatting",
+        "caveat": null,
+        "desc": "calculate and print cycle times",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "da": {
+        "alt": [
+            "dw"
+        ],
+        "args": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "args16": null,
+        "brief": "define address or word",
+        "category": "data storage",
+        "caveat": null,
+        "desc": "define little endian address",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "dat": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "date stamp",
+        "category": "formatting",
+        "caveat": "ProDOS only",
+        "desc": "print the date and time",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "dci": {
+        "alt": [],
+        "args": "$._string_operand",
+        "args16": null,
+        "brief": "dextral character inverted",
+        "category": "strings",
+        "caveat": null,
+        "desc": "same as ASC except string last character has opposite high bit",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "ddb": {
+        "alt": [],
+        "args": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "args16": null,
+        "brief": "define double byte",
+        "category": "data storage",
+        "caveat": null,
+        "desc": "define big endian address",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "dend": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "end dummy section",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "mark the end of a dummy section",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "dfb": {
+        "alt": [
+            "db"
+        ],
+        "args": "$._eaexpr,repeat(seq(',',$._eaexpr))",
+        "args16": null,
+        "brief": "define byte",
+        "category": "data storage",
+        "caveat": null,
+        "desc": "define byte, selects low byte, \\# and < ignored, > selects high byte",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "do": {
+        "alt": [],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "do if true",
+        "category": "conditionals",
+        "caveat": null,
+        "desc": "if expression is zero, stop generating object code",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "ds": {
+        "alt": [],
+        "args": "choice($._aexpr,seq($._aexpr,',',$._aexpr),'\\\\',seq('\\\\',',',$._aexpr))",
+        "args16": null,
+        "brief": "define storage",
+        "category": "data storage",
+        "caveat": null,
+        "desc": "reserve space for string storage data",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "dsk": {
+        "alt": [],
+        "args": "$.filename",
+        "args16": null,
+        "brief": "assemble to disk",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "write assembled code directly to named file on disk",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "dum": {
+        "alt": [],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "dummy section",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "start a section that produces label values, but no object code. Expression gives the ORG of the section.",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "else": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "invert the last do",
+        "category": "conditionals",
+        "caveat": null,
+        "desc": "invert the last do",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "end": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "end of source",
+        "category": "assembler",
+        "caveat": "labels trailing END are not recognized",
+        "desc": "ignore any trailing source code",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "ent": {
+        "alt": [],
+        "args": null,
+        "args16": "optional(seq($._label,repeat(seq(',',$._label))))",
+        "brief": "entry label",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "defines label as referenceable to an external label by another REL module",
+        "label": [
+            "var",
+            "global"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "eom": {
+        "alt": [
+            "<<<"
+        ],
+        "args": null,
+        "args16": null,
+        "brief": "end macro",
+        "category": "macro",
+        "caveat": null,
+        "desc": "end of a macro definition",
+        "label": [
+            "var",
+            "global"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "equ": {
+        "alt": [
+            "="
+        ],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "equate",
+        "category": "assembler",
+        "caveat": "cannot equate to zero page number after label has been used",
+        "desc": "equate label with expression",
+        "label": [
+            "var",
+            "global"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "err": {
+        "alt": [],
+        "args": "optional('\\\\'),$._aexpr",
+        "args16": null,
+        "brief": "force error",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "force error",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "exp": {
+        "alt": [],
+        "args": "choice('ON','OFF','ONLY')",
+        "args16": null,
+        "brief": "expand macros",
+        "category": "formatting",
+        "caveat": null,
+        "desc": "ON prints entire macro, OFF prints only PMC, ONLY omits call line and end of macro line",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "ext": {
+        "alt": [],
+        "args": null,
+        "args16": "optional(seq($._label,repeat(seq(',',$._label))))",
+        "brief": "external label",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "defines label as external for use by linker",
+        "label": [
+            "var",
+            "global"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "fin": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "cancel last DO or IF",
+        "category": "conditionals",
+        "caveat": null,
+        "desc": "cancel last DO or IF",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "fls": {
+        "alt": [],
+        "args": "$._string_operand",
+        "args16": null,
+        "brief": "flashing text",
+        "category": "strings",
+        "caveat": null,
+        "desc": "put text in flashing format",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "hex": {
+        "alt": [],
+        "args": "$.hex_data",
+        "args16": null,
+        "brief": "hex data",
+        "category": "data storage",
+        "caveat": null,
+        "desc": "insert plain hex data",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "if": {
+        "alt": [],
+        "args": "ANYCHAR,ANYCHAR,$.var_label",
+        "args16": "$._aexpr",
+        "brief": "test first character",
+        "category": "conditionals",
+        "caveat": "expression starts with MX for 16 bit case",
+        "desc": "if first character of variable then assemble",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "inv": {
+        "alt": [],
+        "args": "$._string_operand",
+        "args16": null,
+        "brief": "inverse text",
+        "category": "strings",
+        "caveat": null,
+        "desc": "put text in inverse format",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "kbd": {
+        "alt": [],
+        "args": "optional($.dstring)",
+        "args16": null,
+        "brief": "define label from keyboard",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "define label from keyboard",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "lst": {
+        "alt": [],
+        "args": "optional(choice('ON','OFF'))",
+        "args16": "optional('RTN')",
+        "brief": "listing control",
+        "category": "formatting",
+        "caveat": null,
+        "desc": "ON starts listing, OFF stops listing, RTN restores to whatever was before the last LST",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "lstdo": {
+        "alt": [],
+        "args": "optional('OFF')",
+        "args16": null,
+        "brief": "list inactive areas",
+        "category": "formatting",
+        "caveat": null,
+        "desc": "controls whether to list code where DO OFF is in effect",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "lup": {
+        "alt": [],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "begin loop",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "begin loop",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "mac": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "begin macro",
+        "category": "macro",
+        "caveat": "assigned label cannot be referenced except as a macro call",
+        "desc": "start of a macro definition",
+        "label": [
+            "var",
+            "global"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "mx": {
+        "alt": [],
+        "args": null,
+        "args16": "$._aexpr",
+        "brief": "long status mode",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "set intended long status of the 65816",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            16
+        ]
+    },
+    "obj": {
+        "alt": [],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "set object",
+        "category": "assembler",
+        "caveat": "accepted only prior to start of code, must be in range $4000-$BFE0",
+        "desc": "set the division line between symbol table and object code areas",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "org": {
+        "alt": [],
+        "args": "optional($._aexpr)",
+        "args16": null,
+        "brief": "set origin",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "set starting address of assembled code",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "pag": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "send formfeed",
+        "category": "formatting",
+        "caveat": "no effect on screen listing",
+        "desc": "send formfeed to the printer",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "pau": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "pause",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "pause until keypress",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "pmc": {
+        "alt": [
+            ">>>"
+        ],
+        "args": "$._label,optional(seq($._arg_sep,$.macro_args))",
+        "args16": null,
+        "brief": "put macro call",
+        "category": "macro",
+        "caveat": null,
+        "desc": "call the named macro",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "put": {
+        "alt": [],
+        "args": "$.filename",
+        "args16": null,
+        "brief": "put text file",
+        "category": "assembler",
+        "caveat": "Not recursive.  Macro definitions not allowed in PUT file.  Prefix `T.` is assumed for DOS 3.3, unless first character is less than `@`. Slot and drive are not accepted in ProDOS.",
+        "desc": "insert a named file into the assembly source",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "rel": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "relocatable code module",
+        "category": "assembler",
+        "caveat": "must occur prior to any labels",
+        "desc": "generate code compatible with relocating linker",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "rev": {
+        "alt": [],
+        "args": "$.dstring",
+        "args16": null,
+        "brief": "reverse text",
+        "category": "strings",
+        "caveat": null,
+        "desc": "put d-string backwards in memory",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "sav": {
+        "alt": [],
+        "args": "$.filename",
+        "args16": null,
+        "brief": "save object code",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "save object code to named file, starting at last SAV",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "skp": {
+        "alt": [],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "skip lines",
+        "category": "formatting",
+        "caveat": null,
+        "desc": "sends a number of carriage returns to the listing",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "str": {
+        "alt": [],
+        "args": "$._string_operand",
+        "args16": null,
+        "brief": "put delimited string with leading length byte",
+        "category": "strings",
+        "caveat": "trailing hex not counted in length",
+        "desc": "put delimited string with leading length byte",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "sw": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "enable sweet 16",
+        "category": "miscellaneous",
+        "caveat": "Merlin 8",
+        "desc": "enable sweet 16",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8
+        ]
+    },
+    "tr": {
+        "alt": [],
+        "args": "optional(choice('ON','OFF'))",
+        "args16": "optional('ADR')",
+        "brief": "truncate control",
+        "category": "formatting",
+        "caveat": "ADR only for Merlin 16 (suppress bank byte)",
+        "desc": "limits the object code printout to three bytes per source line",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "ttl": {
+        "alt": [],
+        "args": "$.dstring",
+        "args16": null,
+        "brief": "define title heading",
+        "category": "formatting",
+        "caveat": "Merlin 16 only",
+        "desc": "used to change title at top of a page during listing",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "typ": {
+        "alt": [],
+        "args": "$._aexpr",
+        "args16": null,
+        "brief": "set ProDOS file type",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "set filetype used by DSK or SAV, 0=none,6=BIN,255=SYS",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "use": {
+        "alt": [],
+        "args": "$.filename",
+        "args16": null,
+        "brief": "use file as library",
+        "category": "assembler",
+        "caveat": null,
+        "desc": "use text file as macro library",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "usr": {
+        "alt": [],
+        "args": "$.literal",
+        "args16": null,
+        "brief": "user defined",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "user defined",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "var": {
+        "alt": [],
+        "args": "$._aexpr,repeat(seq(';',$._aexpr))",
+        "args16": null,
+        "brief": "setup variables",
+        "category": "assembler",
+        "caveat": "often used just prior to PUT",
+        "desc": "equate several variable labels in one step",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    },
+    "xc": {
+        "alt": [],
+        "args": null,
+        "args16": null,
+        "brief": "extended opcodes",
+        "category": "miscellaneous",
+        "caveat": null,
+        "desc": "once enables 65C02, twice enables 65816",
+        "label": [
+            "var",
+            "global",
+            "local"
+        ],
+        "version": [
+            8,
+            16
+        ]
+    }
+}
