@@ -14,7 +14,7 @@ Support for Merlin 16+ and [Merlin 32](https://brutaldeluxe.fr/products/crossdev
 * Commands: see `Ctrl+P` -> `merlin6502`
 * Activates for file extensions `.asm`, `.S`
 
-<img src="sample/demo.png" width=440 alt="session capture"/>
+<img src="sample/demo-merlin.gif" alt="session capture"/>
 
 ## Apple ][ Special Addresses
 
