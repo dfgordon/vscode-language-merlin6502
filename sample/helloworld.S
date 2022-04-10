@@ -1,15 +1,17 @@
+*** Hello Example ***
+        DSK	MY FILE,D2 ; bad ProDOS name
         ORG     $300
-COUT    EQU     $FDED   ; Apple ROM routine
+COUT    EQU     $FDED   ; Apple II ROM
         DO      0
-init    MAC             ; macro definition
-        LDY     ]1
-        <<<
-        FIN
-        init    #$00
-:loop   LDA     hello,Y
+print   MAC             ; macro definition
+        LDY     #$00
+:loop   LDA     ]1,Y    ; illegal local label
+        BEQ     ]done   ; forward referencing
         JSR     COUT
         INY
-        CPY     #$0E
-        BNE     :loop
+        BRA     :loop   ; illegal op (missing XC)
+]done   EOM
+        FIN     $00     ; unexpected argument
+        print   hello   ; not defined in file
         RTS
-hello   ASC     &"Hello World!"& ; dstring
+HELLO   ASC     &"Hello!"&,00 ; dstring

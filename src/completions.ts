@@ -103,16 +103,31 @@ export class TSCompletionProvider implements vscode.CompletionItemProvider
 	{
 		a2tok.forEach(s =>
 		{
-			ans.push(new vscode.CompletionItem(this.modify(s),vscode.CompletionItemKind.Keyword));
+			let it = { 
+				description: "",
+				label: this.modify(s)
+			};
+			if (Object(opcodes)[s])
+				it.description = Object(opcodes)[s].brief;
+			if (Object(pseudo)[s])
+				it.description = Object(pseudo)[s].brief;
+			ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.Keyword));
 		});
 	}
 	add_procs(ans: Array<vscode.CompletionItem>,a2tok: string[],expr_typ: string)
 	{
 		a2tok.forEach(s =>
 		{
-			s = this.modify(s);
-			ans.push(new vscode.CompletionItem(s+' '+expr_typ,vscode.CompletionItemKind.Keyword));
-			ans[ans.length-1].insertText = new vscode.SnippetString(s+'\t${0}');
+			let it = { 
+				description: "",
+				label: this.modify(s) + ' ' + expr_typ
+			};
+			if (Object(opcodes)[s])
+				it.description = Object(opcodes)[s].brief;
+			if (Object(pseudo)[s])
+				it.description = Object(pseudo)[s].brief;
+			ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.Keyword));
+			ans[ans.length-1].insertText = new vscode.SnippetString(this.modify(s)+'\t${0}');
 		});
 	}
 	analyzeAddressingModes(lst:Array<any>) : boolean

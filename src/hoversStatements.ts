@@ -17,13 +17,27 @@ export class OpcodeHovers
 	{
 		const ans = new Array<vscode.MarkdownString>();
 		const obj = Object(opcodes)[op];
+
 		ans.push(new vscode.MarkdownString('`'+op.toUpperCase()+'`'));
 		ans.push(new vscode.MarkdownString(obj.desc));
-		let proc = 'Processors: '
-		const procMap = obj.processors;
-		for (var it in procMap)
-			proc += procMap[it]+', ';
-		ans.push(new vscode.MarkdownString(proc.substring(0,proc.length-2)));
+		const modeList = obj.modes;
+		if (modeList)
+		{
+			let table = 'op|addr|cyc|xc\n--|---|---|---\n';
+			for (const mode of modeList)
+			{
+				const addr_mnemonic = (mode.addr_mnemonic as string).padEnd(8,' ');
+				const code = '$'+(mode.code as number).toString(16).toUpperCase();
+				const cyc = (mode.cycles as number).toString();
+				let proc = '';
+				if (!mode.processors.includes('6502'))
+					proc += '*';
+				if (!mode.processors.includes('65c02'))
+					proc += '*';
+				table += code+'|'+addr_mnemonic+'|'+cyc+'|'+proc+'\n';
+			}
+			ans.push(new vscode.MarkdownString(table));
+		}
 		this.hmap.set('op_'+op,ans);
 	}
 	constructor()
@@ -32,18 +46,12 @@ export class OpcodeHovers
 			
 		for (const op in opcodes)
 		{
-			//const desc = Object(opcodes)[op].desc;
-			//const proc = Object(opcodes)[op].processors;
-			//const status = Object(opcodes)[op].status;
 			this.add(op);
 		}
 	}
 	get(tok : string) : Array<vscode.MarkdownString> | undefined
 	{
-		const parts = tok.split('_');
-		if (parts.length>1)
-			return this.hmap.get(parts[0]+'_'+parts[1]);
-		return undefined;
+		return this.hmap.get(tok);
 	}
 }
 
@@ -59,10 +67,14 @@ export class PseudoOpcodeHovers
 		ans.push(new vscode.MarkdownString(obj.desc));
 		let v = 'Merlin versions: '
 		const vmap = obj.version;
-		for (var it in vmap)
-			v += vmap[it]+', ';
+		if (vmap)
+			for (const it of vmap)
+				v += it+', ';
 		ans.push(new vscode.MarkdownString(v.substring(0,v.length-2)));
-		this.hmap.set('psop_'+psop,ans);
+		if (psop=='--^')
+			this.hmap.set('psop_end_lup',ans);
+		else
+			this.hmap.set('psop_'+psop,ans);
 	}
 	constructor()
 	{
@@ -75,9 +87,6 @@ export class PseudoOpcodeHovers
 	}
 	get(tok : string) : Array<vscode.MarkdownString> | undefined
 	{
-		const parts = tok.split('_');
-		if (parts.length>1)
-			return this.hmap.get(parts[0]+'_'+parts[1]);
-		return undefined;
+		return this.hmap.get(tok);
 	}
 }

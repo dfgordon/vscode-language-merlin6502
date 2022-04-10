@@ -1,8 +1,10 @@
 # Merlin 6502
 
+![unit tests](https://github.com/dfgordon/vscode-language-merlin6502/actions/workflows/node.js.yml/badge.svg)
+
 Language support for Merlin 8/16 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-If you are using Merlin 32, syntactic distinctions to be aware of are covered [here](https://brutaldeluxe.fr/products/crossdevtools/merlin/).
+Support for Merlin 16+ and [Merlin 32](https://brutaldeluxe.fr/products/crossdevtools/merlin/) is not included at present.
 
 * Semantic highlights true to Merlin 8/16 syntax
 * Completions and hovers for all operations and pseudo-operations
@@ -20,14 +22,23 @@ The extension knows hundreds of special address locations relevant to Integer BA
 
 ## Using with Emulators
 
-Before pasting your source code into emulators with clipboard support, run the ``format for copy and paste`` command.  This will create a new document with the correct formatting, i.e., exactly one space between columns.
+Before pasting your source code into the Merlin editor (e.g., via emulators with clipboard support), run the ``format for copy and paste`` command.  This will create a new document with the correct formatting, i.e., exactly one space between columns.
 
 ## Merlin 8/16 Syntax
 
 The aim is to emulate Merlin syntax exactly. As of this writing, the following are known exceptions:
 
-* Operations with trailing characters are parsed as macro calls, e.g., `LDA:` is parsed as a macro
 * All delimited strings ("dstrings") must be terminated
 * Semicolons cannot be used in any label
 * The opening bracket `[` cannot be used in any label
 * The closing bracket `]` cannot be used in any label, other than as the leading character in a variable
+
+## Processor target and the XC pseudo-operation
+
+In the spirit of the original Merlin, we rely on the `XC` pseudo-operation to enable or disable the various operations and addressing modes associated with the different processor variants. The rules are simple:
+
+* If there is no `XC` in the source, the target is the 6502
+* If there is one `XC` at the beginning of the source, the target is the 65C02
+* If there are two consecutive `XC` at the beginning of the source, the target is the 65802 (Merlin 8) or 65816 (Merlin 16)
+
+This was the default behavior of Merlin 8.

@@ -3,7 +3,7 @@
 	"displayName": "Merlin 6502",
 	"description": "Language support for Merlin 8/16 for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
-	"version": "0.0.0-b",
+	"version": "0.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {

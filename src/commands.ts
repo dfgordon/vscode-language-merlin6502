@@ -125,7 +125,7 @@ export class DisassemblyTool extends lxbase.LangExtBase
 		let verified = this.verify_document();
 		if (!verified)
 			return;
-		const proceed = await proceedDespiteErrors(verified.doc,'Tokenizing');
+		const proceed = await proceedDespiteErrors(verified.doc,'Formatting');
 		if (!proceed)
 			return;
 		verified = this.verify_document();

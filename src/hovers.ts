@@ -54,7 +54,7 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 	}
 	get_hover(curs:Parser.TreeCursor) : lxbase.WalkerChoice
 	{
-		this.range = this.curs_to_range(curs);
+		this.range = this.curs_to_range(curs,this.row,this.col);
 		if (this.range.contains(this.position))
 		{
 			if (this.config.get('hovers.specialAddresses'))
@@ -94,11 +94,14 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 	{
 		this.hover = new Array<vscode.MarkdownString>();
 		this.position = position;
-		const tree = this.parse(document.getText(),"\n");
-		this.walk(tree,this.get_hover.bind(this));
-		if (this.hover.length>0)
-			return new vscode.Hover(this.hover,this.range);
-		else
-			return undefined;
+		this.GetLabels(document);
+		for (this.row=0;this.row<document.lineCount;this.row++)
+		{
+			const tree = this.parse(this.AdjustLine(document),"\n");
+			this.walk(tree,this.get_hover.bind(this));
+			if (this.hover.length>0)
+				return new vscode.Hover(this.hover,this.range);
+		}
+		return undefined;
 	}
 }

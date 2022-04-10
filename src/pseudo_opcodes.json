@@ -108,7 +108,7 @@
     "cyc": {
         "alt": [],
         "args": "optional(choice('OFF','AVE'))",
-        "args16": "optional('FLAGS')",
+        "args16": "optional(choice('OFF','AVE','FLAGS'))",
         "brief": "cycle time",
         "category": "formatting",
         "caveat": null,
@@ -219,7 +219,7 @@
         "alt": [
             "db"
         ],
-        "args": "$._eaexpr,repeat(seq(',',$._eaexpr))",
+        "args": "$._data_aexpr,repeat(seq(',',$._data_aexpr))",
         "args16": null,
         "brief": "define byte",
         "category": "data storage",
@@ -400,7 +400,7 @@
     },
     "err": {
         "alt": [],
-        "args": "optional('\\\\'),$._aexpr",
+        "args": "choice($.ptr_check,seq(optional('\\\\'),$._aexpr))",
         "args16": null,
         "brief": "force error",
         "category": "miscellaneous",
@@ -507,12 +507,12 @@
     },
     "if": {
         "alt": [],
-        "args": "ANYCHAR,ANYCHAR,$.var_label",
-        "args16": "$._aexpr",
-        "brief": "test first character",
+        "args": "$.if_char",
+        "args16": "choice($.if_char,$.if_mx)",
+        "brief": "test first character or MX",
         "category": "conditionals",
-        "caveat": "expression starts with MX for 16 bit case",
-        "desc": "if first character of variable then assemble",
+        "caveat": null,
+        "desc": "if first character of variable matches, or if expression starting with MX is true, then assemble",
         "label": [
             "var",
             "global",
@@ -562,7 +562,7 @@
     "lst": {
         "alt": [],
         "args": "optional(choice('ON','OFF'))",
-        "args16": "optional('RTN')",
+        "args16": "optional(choice('ON','OFF','RTN'))",
         "brief": "listing control",
         "category": "formatting",
         "caveat": null,
@@ -723,7 +723,7 @@
         "alt": [
             ">>>"
         ],
-        "args": "$._label,optional(seq($._arg_sep,$.macro_args))",
+        "args": "$.global_label,optional(seq($._arg_sep,$.macro_args))",
         "args16": null,
         "brief": "put macro call",
         "category": "macro",
@@ -867,7 +867,7 @@
     "tr": {
         "alt": [],
         "args": "optional(choice('ON','OFF'))",
-        "args16": "optional('ADR')",
+        "args16": "optional(choice('ON','OFF','ADR'))",
         "brief": "truncate control",
         "category": "formatting",
         "caveat": "ADR only for Merlin 16 (suppress bank byte)",
