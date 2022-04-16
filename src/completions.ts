@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as specialAddresses from './specialAddresses.json';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
+import * as lxbase from './langExtBase';
 
 export class AddressCompletionProvider implements vscode.CompletionItemProvider
 {
@@ -23,7 +24,7 @@ export class AddressCompletionProvider implements vscode.CompletionItemProvider
 		this.callCompletions = new Array<vscode.CompletionItem>();
 		const config = vscode.workspace.getConfiguration('merlin6502');
 		this.negativeAddr = false;
-		for (const addr in specialAddresses)
+		for (const addr of Object.keys(specialAddresses))
 		{
 			const typ = Object(specialAddresses)[addr].type;
 			const ctx = Object(specialAddresses)[addr].ctx;
@@ -73,7 +74,7 @@ export class AddressCompletionProvider implements vscode.CompletionItemProvider
 		let linePrefix = document.lineAt(position).text.substring(0,position.character);
 		if (!vscode.workspace.getConfiguration('merlin6502').get('case.caseSensitive'))
 			linePrefix = linePrefix.toUpperCase();
-		if (linePrefix.search(/EQU\s+\$$/)>-1)
+		if (linePrefix.search(/(EQU|=)\s+\$$/)>-1)
 		{
 			ans = ans.concat(this.peekCompletions);
 			ans = ans.concat(this.callCompletions);
@@ -85,13 +86,8 @@ export class AddressCompletionProvider implements vscode.CompletionItemProvider
 	}
 }
 
-export class TSCompletionProvider implements vscode.CompletionItemProvider
+export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.CompletionItemProvider
 {
-	config : vscode.WorkspaceConfiguration;
-	constructor()
-	{
-		this.config = vscode.workspace.getConfiguration('merlin6502');
-	}
 	modify(s:string)
 	{
 		if (this.config.get('case.lowerCaseCompletions') && !this.config.get('case.caseSensitive'))
@@ -99,11 +95,23 @@ export class TSCompletionProvider implements vscode.CompletionItemProvider
 		else
 			return s.toUpperCase();
 	}
+	add_label(ans: Array<vscode.CompletionItem>,a2tok: Set<string>)
+	{
+		a2tok.forEach(s =>
+		{
+			if (s[0]==':')
+				ans.push(new vscode.CompletionItem({description:"local",label:s.substring(1)},vscode.CompletionItemKind.Constant));
+			else if (s[0]==']')
+				ans.push(new vscode.CompletionItem({description:"variable",label:s.substring(1)},vscode.CompletionItemKind.Variable));
+			else
+				ans.push(new vscode.CompletionItem({description:"global",label:s},vscode.CompletionItemKind.Constant));
+		});
+	}
 	add_simple(ans: Array<vscode.CompletionItem>,a2tok: string[])
 	{
 		a2tok.forEach(s =>
 		{
-			let it = { 
+			const it = { 
 				description: "",
 				label: this.modify(s)
 			};
@@ -118,7 +126,7 @@ export class TSCompletionProvider implements vscode.CompletionItemProvider
 	{
 		a2tok.forEach(s =>
 		{
-			let it = { 
+			const it = { 
 				description: "",
 				label: this.modify(s) + ' ' + expr_typ
 			};
@@ -130,13 +138,27 @@ export class TSCompletionProvider implements vscode.CompletionItemProvider
 			ans[ans.length-1].insertText = new vscode.SnippetString(this.modify(s)+'\t${0}');
 		});
 	}
-	analyzeAddressingModes(lst:Array<any>) : boolean
+	instructionHasArguments(lst:Array<{addr_mnemonic:string,code:number,cycles:number,processors:string[]}>) : boolean
 	{
-		for (var it in lst)
+		if (lst==undefined)
+			return false;
+		for (const it of lst)
 		{
-			if (['accum','impl','s'].indexOf(lst[it].addr_mnemonic)==-1)
-				return true;
+			if (['accum','impl','s'].includes(it.addr_mnemonic))
+				return false;
 		}
+		return true;
+	}
+	instructionEnabled(lst:Array<string>) : boolean
+	{
+		if (!lst)
+			return false;
+		if (lst.includes('6502'))
+			return true;
+		else if (lst.includes('65c02') && this.xcCount>0)
+			return true;
+		else if (lst.includes('65c816') && this.xcCount>1)
+			return true;
 		return false;
 	}
 	provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.CompletionContext)
@@ -145,27 +167,53 @@ export class TSCompletionProvider implements vscode.CompletionItemProvider
 		const ans = new Array<vscode.CompletionItem>();
 		const procs = new Array<string>();
 		const simple = new Array<string>();
+		const label = new Set<string>();
 
-		let linePrefix = document.lineAt(position).text.substring(0,position.character);
-		if (linePrefix.search(/^[^ \t]*[ \t]+[A-Za-z]+$/)>-1) // start of opcode column?
+		const linePrefix = document.lineAt(position).text.substring(0,position.character);
+		if (linePrefix.charAt(0)=='*')
+			return undefined;
+		this.GetLabels(document);
+		if (linePrefix.search(/^\S*\s+[A-Za-z]$/)>-1) // start of opcode column?
 		{
-			for (var it in opcodes)
+			for (const k of Object.keys(opcodes))
 			{
-				if (this.analyzeAddressingModes(Object(opcodes)[it].modes))
-					procs.push(it);
-				else
-					simple.push(it);
+				if (this.instructionEnabled(Object(opcodes)[k].processors))
+				{
+					if (this.instructionHasArguments(Object(opcodes)[k].modes))
+						procs.push(k);
+					else
+						simple.push(k);
+				}
 			}
-			for (var it in pseudo)
+			for (const k of Object.keys(pseudo))
 			{
-				if (Object(pseudo)[it].args || Object(pseudo)[it].args16)
-					procs.push(it);
+				const v = Object(pseudo)[k];
+				if (v.args || v.args16)
+					procs.push(k);
 				else
-					simple.push(it);
+					simple.push(k);
 			}
-			this.add_simple(ans,simple);
-			this.add_procs(ans,procs,'operand');
+			for (const v of this.labels.macros)
+				label.add(v);
 		}
+		if (linePrefix.search(/^:$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+:$/)>-1) // pressed `:` in first or third column
+		{
+			for (const v of this.labels.locals)
+				label.add(v.substring(v.indexOf('\u0100')+1));
+		}
+		if (linePrefix.search(/^]$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+]$/)>-1) // pressed `]` in first or third column
+		{
+			for (const v of this.labels.vars)
+				label.add(v);
+		}
+		if (linePrefix.search(/^[a-zA-Z]$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+[a-zA-Z]$/)>-1) // pressed alpha in first or third column
+		{
+			for (const v of this.labels.globals)
+				label.add(v);
+		}
+		this.add_simple(ans,simple);
+		this.add_procs(ans,procs,'operand');
+		this.add_label(ans,label);
 
 		if (ans.length>0)
 			return ans;

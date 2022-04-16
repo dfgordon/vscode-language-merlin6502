@@ -17,7 +17,7 @@ export function activate(context: vscode.ExtensionContext)
 		const diagnostics = new TSDiagnosticProvider(TSInitResult);
 		const tokens = new TSSemanticTokensProvider(TSInitResult);
 		const hovers = new TSHoverProvider(TSInitResult);
-		const snippetCompletions = new completions.TSCompletionProvider();
+		const snippetCompletions = new completions.TSCompletionProvider(TSInitResult);
 		const addressCompletions = new completions.AddressCompletionProvider();
 		const disassembler = new com.DisassemblyTool(TSInitResult);
 		if (vscode.window.activeTextEditor)
@@ -26,11 +26,11 @@ export function activate(context: vscode.ExtensionContext)
 		}
 		vscode.languages.registerDocumentSemanticTokensProvider(selector,tokens,legend);
 		vscode.languages.registerHoverProvider(selector,hovers);
-		vscode.languages.registerCompletionItemProvider(selector,snippetCompletions);
+		vscode.languages.registerCompletionItemProvider(selector,snippetCompletions,':',']');
 		vscode.languages.registerCompletionItemProvider(selector,addressCompletions,'$');
 
-		//context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",disassembler.getFrontVirtualII,disassembler));
-		//context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",disassembler.getAppleWinSaveState,disassembler));
+		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",disassembler.getFrontVirtualII,disassembler));
+		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",disassembler.getAppleWinSaveState,disassembler));
 		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",disassembler.showPasteableProgram,disassembler));
 
 		context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {

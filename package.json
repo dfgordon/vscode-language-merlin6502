@@ -18,7 +18,9 @@
 	],
 	"activationEvents": [
 		"onLanguage:merlin6502",
-		"onCommand:merlin6502.format"
+		"onCommand:merlin6502.format",
+		"onCommand:merlin6502.getFrontVii",
+		"onCommand:merlin6502.getAppleWinSaveState"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
@@ -77,6 +79,14 @@
 			{
 				"command": "merlin6502.format",
 				"title": "merlin6502: Format for copy and paste into Merlin 8"
+			},
+			{
+				"command": "merlin6502.getFrontVii",
+				"title": "merlin6502: Insert from Virtual ][ front machine"
+			},
+			{
+				"command": "merlin6502.getAppleWinSaveState",
+				"title": "merlin6502: Insert from AppleWin save state"
 			}
 		],
 		"menus": {
@@ -84,18 +94,26 @@
 				{
 					"command": "merlin6502.format",
 					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.getFrontVii",
+					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.getAppleWinSaveState",
+					"when": "editorLangId == merlin6502"
 				}
 			]
 		}
 	},
 	"dependencies": {
 		"web-tree-sitter": "^0.20.3",
-		"yaml": "^2.0.0-10"
+		"yaml": "^2.0.1"
 	},
 	"scripts": {
 		"reset": "run-script-os",
-		"reset:windows": "npx rimraf out && mkdir out && copy src\\*.wasm out",
-		"reset:default": "npx rimraf out && mkdir out && cp src/*.wasm out",
+		"reset:windows": "npx rimraf out && mkdir out && copy src\\*.wasm out && copy src\\*.scpt out",
+		"reset:default": "npx rimraf out && mkdir out && cp src/*.wasm out && cp src/*.scpt out",
 		"vscode:prepublish": "npm run esbuild-base -- --minify",
 		"esbuild-base": "npm run reset && esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
 		"build": "npm run esbuild-base -- --sourcemap",

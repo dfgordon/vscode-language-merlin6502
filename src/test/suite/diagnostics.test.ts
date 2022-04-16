@@ -21,8 +21,8 @@ describe('Diagnostics: Processors', async function() {
 				continue;
 			const diagList = collection[1];
 			assert.strictEqual(diagList.length,2);
-			assert.match(diagList[0].message,/operation disabled.*/);
-			assert.match(diagList[1].message,/addressing mode disabled.*/);
+			assert.match(diagList[0].message,/macro is undefined.*/);
+			assert.match(diagList[1].message,/macro name matches a disabled instruction.*/);
 		}
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
@@ -174,7 +174,24 @@ describe('Diagnostics: declarations', async function() {
 				continue;
 			const diagList = collection[1];
 			assert.strictEqual(diagList.length,1);
-			assert.match(diagList[0].message,/global label is not defined.*/);
+			assert.match(diagList[0].message,/global label is undefined.*/);
+		}
+		while (vscode.window.activeTextEditor)
+			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
+	});
+	it('possibly undefined', async function() {
+		const doc = await vscode.workspace.openTextDocument({content:' PUT FILE\nG1 EQU $00\n LDA G1\n LDA G2\n LDA G3\nG3 EQU $01',language:'merlin6502'});
+		const ed = await vscode.window.showTextDocument(doc);
+		if (!ed)
+			assert.fail('no active text editor');
+		const collections = vscode.languages.getDiagnostics();
+		for (const collection of collections)
+		{
+			if (collection[0]!=doc.uri)
+				continue;
+			const diagList = collection[1];
+			assert.strictEqual(diagList.length,1);
+			assert.match(diagList[0].message,/global label might be undefined.*/);
 		}
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);

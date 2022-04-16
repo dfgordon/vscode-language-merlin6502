@@ -36,6 +36,37 @@ export async function TreeSitterInit(): Promise<[Parser,Parser.Language,Parser.L
 	return [parser,Merlin6502,Merlin6502CaseSens,caseSens];
 }
 
+export class LabelSet
+{
+	globals : Set<string>;
+	locals : Set<string>;
+	vars : Set<string>;
+	macros : Set<string>;
+	runningVars : Set<string>;
+	runningMacros : Set<string>;
+	constructor()
+	{
+		this.globals = new Set<string>();
+		this.locals = new Set<string>();
+		this.vars = new Set<string>();
+		this.macros = new Set<string>();
+		this.runningVars = new Set<string>();
+		this.runningMacros = new Set<string>();
+	}
+	add(labels:LabelSet)
+	{
+		this.globals = new Set([...this.globals,...labels.globals]);
+		this.locals = new Set([...this.locals,...labels.locals]);
+		this.vars = new Set([...this.vars,...labels.vars]);
+		this.macros = new Set([...this.macros,...labels.macros]);
+	}
+	add_running(labels:LabelSet)
+	{
+		this.runningVars = new Set([...this.runningVars,...labels.runningVars]);
+		this.runningMacros = new Set([...this.runningMacros,...labels.runningMacros]);
+	}
+}
+
 export class LangExtBase
 {
 	parser : Parser;
@@ -43,16 +74,15 @@ export class LangExtBase
 	Merlin6502CaseSens : Parser.Language;
 	config : vscode.WorkspaceConfiguration;
 	caseSens: boolean;
-	globals : Set<string>;
-	locals : Set<string>;
-	vars : Set<string>;
-	macros : Set<string>;
-	reserved : RegExp;
-	pseudoReserved : RegExp;
-	currScope : string = '';
-	row : number = 0;
-	col : number = 0;
-	xcCount : number = 0;
+	labels: LabelSet;
+	opExactPattern : RegExp;
+	psopExactPattern : RegExp;
+	opPrefixPattern : RegExp;
+	psopPrefixPattern : RegExp;
+	currScope = '';
+	row = 0;
+	col = 0;
+	xcCount = 0;
 	constructor(TSInitResult : [Parser,Parser.Language,Parser.Language,boolean])
 	{
 		this.parser = TSInitResult[0];
@@ -60,12 +90,11 @@ export class LangExtBase
 		this.Merlin6502CaseSens = TSInitResult[2];
 		this.caseSens = TSInitResult[3];
 		this.config = vscode.workspace.getConfiguration('merlin6502');
-		this.globals = new Set<string>();
-		this.locals = new Set<string>();
-		this.vars = new Set<string>();
-		this.macros = new Set<string>();
-		this.pseudoReserved = /MAC/;
-		this.reserved = /ADC/;
+		this.labels = new LabelSet;
+		this.opExactPattern = /ADC/;
+		this.psopExactPattern = /MAC/;
+		this.opPrefixPattern = /ADC/;
+		this.psopPrefixPattern = /MAC/;
 	}
 	set_reserved_words()
 	{
@@ -80,29 +109,33 @@ export class LangExtBase
 				continue;
 			if (this.xcCount==1 && !proc.includes('65c02'))
 				continue;
-			if (patt!='')
-				patt += '|^'
-			patt += op.toUpperCase() + '$';
+			if (patt=='')
+				patt += '^('
+			else
+				patt += '|'
+			patt += op.toUpperCase();
 			const alt = Object(opcodes)[op]['alt'];
-			for (var i=0;i<alt.length;i++)
+			for (let i=0;i<alt.length;i++)
 			{
-				patt += '|^' + alt[i].toUpperCase() + '$';
+				patt += '|' + alt[i].toUpperCase();
 			}
 		}
-		this.reserved = RegExp(patt,flags);
-		patt = '^POPD|^DEND';
+		this.opExactPattern = RegExp(patt+')$',flags);
+		this.opPrefixPattern = RegExp(patt+')\\S*$',flags);
+		patt = '^(POPD|DEND';
 		for (const psop in pseudo)
 		{
 			if (psop=='default')
 				continue;
-			patt += '|^' + psop.toUpperCase() + '$';
+			patt += '|' + psop.toUpperCase().replace('^','\\^');
 			const alt = Object(pseudo)[psop]['alt'];
-			for (var i=0;i<alt.length;i++)
+			for (let i=0;i<alt.length;i++)
 			{
-				patt += '|^' + alt[i].toUpperCase() + '$';
+				patt += '|' + alt[i].toUpperCase().replace('^','\\^');
 			}
 		}
-		this.pseudoReserved = RegExp(patt,flags);
+		this.psopExactPattern = RegExp(patt+')$',flags);
+		this.psopPrefixPattern = RegExp(patt+')\\S*$',flags);
 	}
 	curs_to_range(curs: Parser.TreeCursor, rowOffset: number, colOffset: number): vscode.Range
 	{
@@ -171,19 +204,23 @@ export class LangExtBase
 		{
 			if (child.type=='global_label')
 			{
-				this.globals.add(child.text);
 				if (next && next.type=='psop_mac')
-					this.macros.add(child.text);
+				{
+					this.labels.macros.add(child.text);
+				}
 				else
+				{
+					this.labels.globals.add(child.text);
 					this.currScope = child.text;
+				}
 			}
 			if (child.type=='local_label')
 			{
-				this.locals.add(this.currScope+child.text);
+				this.labels.locals.add(this.currScope+'\u0100'+child.text);
 			}
 			if (child.type=='var_label')
 			{
-				this.vars.add(child.text);
+				this.labels.vars.add(child.text);
 			}
 			return WalkerOptions.gotoParentSibling;
 		}
@@ -193,13 +230,10 @@ export class LangExtBase
 	}
 	GetLabels(document: vscode.TextDocument)
 	{
-		this.globals = new Set<string>();
-		this.locals = new Set<string>();
-		this.vars = new Set<string>();
-		this.macros = new Set<string>();
+		this.labels = new LabelSet;
 		this.currScope = '';
 		this.xcCount = 0;
-		for (var row=0;row<document.lineCount;row++)
+		for (let row=0;row<document.lineCount;row++)
 		{
 			const programLine = document.lineAt(row).text;
 			const tree = this.parse(programLine,"\n");
@@ -214,17 +248,18 @@ export class LangExtBase
 	/// GetLabels must be called before the first line is processed.
 	AdjustLine(document: vscode.TextDocument) : string
 	{
+		// Doing this with regex only - have to be careful
 		const programLine = document.lineAt(this.row).text;
-		const startTree = this.parse(programLine,"\n");
-		const op = startTree.rootNode.firstChild;
-		const match = programLine.match(/[ \t]+\S+/);
+		if (programLine.charAt(0)=='*')
+			return programLine;
+		const match = programLine.match(/\s+\S+/);
 		let prefix = '';
-		if (match && op && (op.type=='operation' || op.type=='pseudo_operation'))
+		if (match)
 		{
 			const mnemonic = match[0].trim();
-			if (this.macros.has(mnemonic) && mnemonic.match(this.reserved)==null && mnemonic.match(this.pseudoReserved)==null)
+			if (this.labels.macros.has(mnemonic) && mnemonic.match(this.opExactPattern)==null && mnemonic.match(this.psopExactPattern)==null)
 				prefix = '\u0100';
-			if (op.type=='operation' && mnemonic.match(this.reserved)==null)
+			if (mnemonic.match(this.opPrefixPattern)==null && mnemonic.match(this.psopPrefixPattern)==null)
 				prefix = '\u0100';
 		}
 		this.col = -prefix.length;

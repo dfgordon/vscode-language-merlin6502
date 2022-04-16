@@ -23,7 +23,7 @@ export class OpcodeHovers
 		const modeList = obj.modes;
 		if (modeList)
 		{
-			let table = 'op|addr|cyc|xc\n--|---|---|---\n';
+			let table = 'addr|cyc|op|xc\n---|---:|---|---\n';
 			for (const mode of modeList)
 			{
 				const addr_mnemonic = (mode.addr_mnemonic as string).padEnd(8,' ');
@@ -34,9 +34,18 @@ export class OpcodeHovers
 					proc += '*';
 				if (!mode.processors.includes('65c02'))
 					proc += '*';
-				table += code+'|'+addr_mnemonic+'|'+cyc+'|'+proc+'\n';
+				table += addr_mnemonic+'|'+cyc+'|'+code+'|'+proc+'\n';
 			}
 			ans.push(new vscode.MarkdownString(table));
+		}
+		const stat = obj.status as string;
+		if (stat)
+		{
+			let statusTab = 'N|V|M|X|D|I|Z|C\n---|---|---|---|---|---|---|---\n'
+			for (let i=0;i<8;i++)
+				statusTab += stat.charAt(i) + '|';
+			ans.push(new vscode.MarkdownString('status register'));
+			ans.push(new vscode.MarkdownString(statusTab));
 		}
 		this.hmap.set('op_'+op,ans);
 	}
