@@ -8,7 +8,8 @@ export const WalkerOptions = {
 	gotoChild: 0,
 	gotoSibling: 1,
 	gotoParentSibling: 2,
-	exit: 3
+	exit: 3,
+	abort: 4
 } as const;
 
 export type WalkerChoice = typeof WalkerOptions[keyof typeof WalkerOptions];
@@ -83,18 +84,42 @@ export class LangExtBase
 	row = 0;
 	col = 0;
 	xcCount = 0;
+	merlinVersion = 'v8';
+	linkerCount = 0;
 	constructor(TSInitResult : [Parser,Parser.Language,Parser.Language,boolean])
 	{
 		this.parser = TSInitResult[0];
 		this.Merlin6502 = TSInitResult[1];
 		this.Merlin6502CaseSens = TSInitResult[2];
 		this.caseSens = TSInitResult[3];
-		this.config = vscode.workspace.getConfiguration('merlin6502');
 		this.labels = new LabelSet;
 		this.opExactPattern = /ADC/;
 		this.psopExactPattern = /MAC/;
 		this.opPrefixPattern = /ADC/;
 		this.psopPrefixPattern = /MAC/;
+		this.config = vscode.workspace.getConfiguration('merlin6502');
+		this.reset();
+	}
+	reset()
+	{
+		this.config = vscode.workspace.getConfiguration('merlin6502');
+		const v = this.config.get('version') as string;
+		if (v)
+			this.merlinVersion = 'v' + v.substring(v.indexOf(' ')+1);
+		if (this.merlinVersion=='v8')
+			this.xcCount = 0;
+		else
+			this.xcCount = 2;
+		this.currScope = '';
+		this.linkerCount = 0;
+	}
+	get_interpretation(doc: vscode.TextDocument) : string
+	{
+		const threshold = this.config.get('linker.detect') as number;
+		if (this.linkerCount/doc.lineCount > threshold)
+			return 'linker';
+		else
+			return 'source';
 	}
 	set_reserved_words()
 	{
@@ -120,12 +145,14 @@ export class LangExtBase
 				patt += '|' + alt[i].toUpperCase();
 			}
 		}
-		this.opExactPattern = RegExp(patt+')$',flags);
+		this.opExactPattern = RegExp(patt+')$','i');
 		this.opPrefixPattern = RegExp(patt+')\\S*$',flags);
 		patt = '^(POPD|DEND';
 		for (const psop in pseudo)
 		{
 			if (psop=='default')
+				continue;
+			if (!Object(pseudo)[psop]['version'].includes(this.merlinVersion))
 				continue;
 			patt += '|' + psop.toUpperCase().replace('^','\\^');
 			const alt = Object(pseudo)[psop]['alt'];
@@ -134,7 +161,7 @@ export class LangExtBase
 				patt += '|' + alt[i].toUpperCase().replace('^','\\^');
 			}
 		}
-		this.psopExactPattern = RegExp(patt+')$',flags);
+		this.psopExactPattern = RegExp(patt+')$','i');
 		this.psopPrefixPattern = RegExp(patt+')\\S*$',flags);
 	}
 	curs_to_range(curs: Parser.TreeCursor, rowOffset: number, colOffset: number): vscode.Range
@@ -175,7 +202,7 @@ export class LangExtBase
 		}
 		return this.parser.parse(txt+append);
 	}
-	walk(syntaxTree: Parser.Tree,visit: (node: Parser.TreeCursor) => WalkerChoice)
+	walk(syntaxTree: Parser.Tree,visit: (node: Parser.TreeCursor) => WalkerChoice) : WalkerChoice
 	{
 		const curs = syntaxTree.walk();
 		let choice : WalkerChoice = WalkerOptions.gotoChild;
@@ -193,7 +220,24 @@ export class LangExtBase
 				choice = WalkerOptions.gotoSibling;
 			else
 				choice = WalkerOptions.exit;
-		} while (choice!=WalkerOptions.exit);
+		} while (choice!=WalkerOptions.exit && choice!=WalkerOptions.abort);
+		return choice;
+	}
+	visitOnlyXC(curs: Parser.TreeCursor) : WalkerChoice
+	{
+		const curr = curs.currentNode();
+		if (curr.type=='psop_xc')
+		{
+			if (curr.nextSibling && curr.nextSibling.text.toUpperCase()=='OFF')
+				this.xcCount = 0;
+			else
+				this.xcCount += 1;
+			if (this.xcCount>2)
+				this.xcCount = 2;
+		}
+		else if (curr.type.substring(0,3)=='op_' || curr.type.substring(0,5)=='psop_')
+			return WalkerOptions.abort;
+		return WalkerOptions.gotoChild;
 	}
 	visitLabelDefs(curs: Parser.TreeCursor) : WalkerChoice
 	{
@@ -225,14 +269,32 @@ export class LangExtBase
 			return WalkerOptions.gotoParentSibling;
 		}
 		if (curr.type=='psop_xc')
-			this.xcCount += 1;
+		{
+			if (curr.nextSibling && curr.nextSibling.text.toUpperCase()=='OFF')
+				this.xcCount = 0;
+			else
+				this.xcCount += 1;
+			if (this.xcCount>2)
+				this.xcCount = 2;
+		}
+		if (curr.type=='global_label' && curs.currentFieldName()=='mac' && ['LNK','LKV','ASM'].includes(curr.text.toUpperCase()))
+			this.linkerCount += 1;
 		return WalkerOptions.gotoChild;
+	}
+	GetOnlyXC(document: vscode.TextDocument)
+	{
+		for (let row=0;row<document.lineCount;row++)
+		{
+			const programLine = document.lineAt(row).text;
+			const tree = this.parse(programLine,"\n");
+			if (this.walk(tree,this.visitOnlyXC.bind(this))==WalkerOptions.abort)
+				break;
+		}
 	}
 	GetLabels(document: vscode.TextDocument)
 	{
+		this.reset();
 		this.labels = new LabelSet;
-		this.currScope = '';
-		this.xcCount = 0;
 		for (let row=0;row<document.lineCount;row++)
 		{
 			const programLine = document.lineAt(row).text;
@@ -257,9 +319,11 @@ export class LangExtBase
 		if (match)
 		{
 			const mnemonic = match[0].trim();
-			if (this.labels.macros.has(mnemonic) && mnemonic.match(this.opExactPattern)==null && mnemonic.match(this.psopExactPattern)==null)
+			const anyExactMatch = mnemonic.match(this.opExactPattern) || mnemonic.match(this.psopExactPattern);
+			const anyMatch = anyExactMatch || mnemonic.match(this.opPrefixPattern) || mnemonic.match(this.psopPrefixPattern)
+			if (this.labels.macros.has(mnemonic) && !anyExactMatch)
 				prefix = '\u0100';
-			if (mnemonic.match(this.opPrefixPattern)==null && mnemonic.match(this.psopPrefixPattern)==null)
+			if (!anyMatch)
 				prefix = '\u0100';
 		}
 		this.col = -prefix.length;

@@ -53,7 +53,8 @@ export class AddressCompletionProvider implements vscode.CompletionItemProvider
 		num_addr = num_addr<0 && !this.negativeAddr ? num_addr+2**16 : num_addr;
 		num_addr = num_addr>=2**15 && this.negativeAddr ? num_addr-2**16 : num_addr;
 		let addr_str = num_addr.toString(16);
-		if (vscode.workspace.getConfiguration('merlin6502').get('case.caseSensitive'))
+		const config = vscode.workspace.getConfiguration('merlin6502');
+		if (config.get('case.caseSensitive') || !config.get('case.lowerCaseCompletions'))
 			addr_str = addr_str.toUpperCase();
 		const it = { 
 			description: addr_entry.brief,
@@ -88,6 +89,32 @@ export class AddressCompletionProvider implements vscode.CompletionItemProvider
 
 export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.CompletionItemProvider
 {
+	complMap = Object({
+		'imm': '#${0:imm}',
+		'abs': '${0:abs}',
+		'zp': '${0:zp}',
+		'rel': '${0:rel}',
+		'rell': '${0:rell}',
+		'absl': '${0:absl}',
+		'(zp,x)': '(${1:zp},x)$0',
+		'(abs,x)': '(${1:abs},x)$0',
+		'(zp),y': '(${1:zp}),y$0',
+		'zp,x': '${1:zp},x$0',
+		'abs,x': '${1:abs},x$0',
+		'absl,x': '${1:absl},x$0',
+		'zp,y': '${1:zp},y$0',
+		'abs,y': '${1:abs},y$0',
+		'(abs)': '(${1:abs})$0',
+		'(zp)': '(${1:zp})$0',
+		'[d]': '[${1:d}]$0',
+		'[d],y': '[${1:d}],y$0',
+		'd,s': '${1:d},s$0',
+		'(d,s),y': '(${1:d},s),y$0',
+		'xyc': '${1:dstbnk},${0:srcbnk}',
+		'impl': '',
+		'accum': '',
+		's': ''
+	});
 	modify(s:string)
 	{
 		if (this.config.get('case.lowerCaseCompletions') && !this.config.get('case.caseSensitive'))
@@ -122,21 +149,54 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 			ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.Keyword));
 		});
 	}
-	add_procs(ans: Array<vscode.CompletionItem>,a2tok: string[],expr_typ: string)
+	add_args(ans: Array<vscode.CompletionItem>,op: string)
 	{
-		a2tok.forEach(s =>
+		const req = ['6502','65c02','65c816'][this.xcCount];
+		const psopInfo = Object(pseudo)[op.toLowerCase()];
+		const opInfo = Object(opcodes)[op.toLowerCase()];
+		if (opInfo)
 		{
-			const it = { 
-				description: "",
-				label: this.modify(s) + ' ' + expr_typ
-			};
-			if (Object(opcodes)[s])
-				it.description = Object(opcodes)[s].brief;
-			if (Object(pseudo)[s])
-				it.description = Object(pseudo)[s].brief;
-			ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.Keyword));
-			ans[ans.length-1].insertText = new vscode.SnippetString(this.modify(s)+'\t${0}');
-		});
+			const modeList = opInfo.modes;
+			for (const mode of modeList)
+			{
+				const snip = this.complMap[mode.addr_mnemonic];
+				if (mode.processors.includes(req) && snip && snip.length>0)
+				{
+					const it = { 
+						description: this.modify(op) + " args",
+						label: this.modify(mode.addr_mnemonic)
+					};
+					ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.Value));
+					ans[ans.length-1].insertText = new vscode.SnippetString(this.modify(snip));
+				}
+			}
+		}
+		if (psopInfo)
+		{
+			const args : string[] = psopInfo.enum;
+			let v8x : string = psopInfo.v8x;
+			let v16x : string = psopInfo.v16x;
+			v8x = v8x?.substring(1,v8x.length-1);
+			v16x = v16x?.substring(1,v16x.length-1);
+			if (args)
+			{
+				args.forEach(s => {
+					if (s.length>0)
+					{
+						const unsupported = (v8x && this.merlinVersion=='v8' && s.match(RegExp(v8x,'i'))) ||
+							(v16x && this.merlinVersion=='v16' && s.match(RegExp(v16x,'i')));
+						if (!unsupported)
+						{
+							const it = { 
+								description: this.modify(op) + " args",
+								label: this.modify(s)
+							};
+							ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.EnumMember));
+						}
+					}
+				});
+			}
+		}
 	}
 	instructionHasArguments(lst:Array<{addr_mnemonic:string,code:number,cycles:number,processors:string[]}>) : boolean
 	{
@@ -161,11 +221,17 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 			return true;
 		return false;
 	}
+	pseudoOpEnabled(lst:Array<string>) : boolean
+	{
+		if (lst && lst.includes(this.merlinVersion))
+			return true;
+		return false;
+	}
 	provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.CompletionContext)
 	{
 		this.config = vscode.workspace.getConfiguration('merlin6502');
+		this.GetOnlyXC(document);
 		const ans = new Array<vscode.CompletionItem>();
-		const procs = new Array<string>();
 		const simple = new Array<string>();
 		const label = new Set<string>();
 
@@ -176,23 +242,11 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 		if (linePrefix.search(/^\S*\s+[A-Za-z]$/)>-1) // start of opcode column?
 		{
 			for (const k of Object.keys(opcodes))
-			{
 				if (this.instructionEnabled(Object(opcodes)[k].processors))
-				{
-					if (this.instructionHasArguments(Object(opcodes)[k].modes))
-						procs.push(k);
-					else
-						simple.push(k);
-				}
-			}
-			for (const k of Object.keys(pseudo))
-			{
-				const v = Object(pseudo)[k];
-				if (v.args || v.args16)
-					procs.push(k);
-				else
 					simple.push(k);
-			}
+			for (const k of Object.keys(pseudo))
+				if (this.pseudoOpEnabled(Object(pseudo)[k].version))
+					simple.push(k);
 			for (const v of this.labels.macros)
 				label.add(v);
 		}
@@ -211,8 +265,15 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 			for (const v of this.labels.globals)
 				label.add(v);
 		}
+		if (linePrefix.search(/^\S*\s+\S+\s+$/)>-1) // search for (pseudo)-instruction args upon space
+		{
+			const match = linePrefix.match(/^\S*\s+(\S+)/);
+			if (match)
+			{
+				this.add_args(ans,match[1]);
+			}
+		}
 		this.add_simple(ans,simple);
-		this.add_procs(ans,procs,'operand');
 		this.add_label(ans,label);
 
 		if (ans.length>0)

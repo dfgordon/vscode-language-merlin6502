@@ -19,6 +19,7 @@
 	"activationEvents": [
 		"onLanguage:merlin6502",
 		"onCommand:merlin6502.format",
+		"onCommand:merlin6502.columns",
 		"onCommand:merlin6502.getFrontVii",
 		"onCommand:merlin6502.getAppleWinSaveState"
 	],
@@ -36,6 +37,41 @@
 					"type": "boolean",
 					"default": false,
 					"markdownDescription": "Use lower case in completions and snippets (ingored if `#merlin6502.caseSensitive#`)."
+				},
+				"merlin6502.columns.c1": {
+					"type": "number",
+					"default": 9,
+					"minimum": 1,
+					"markdownDescription": "Width of the label column to use in formatting"
+				},
+				"merlin6502.columns.c2": {
+					"type": "number",
+					"default": 6,
+					"minimum": 1,
+					"markdownDescription": "Width of the instruction column to use in formatting"
+				},
+				"merlin6502.columns.c3": {
+					"type": "number",
+					"default": 11,
+					"minimum": 1,
+					"markdownDescription": "Width of the operand column to use in formatting"
+				},
+				"merlin6502.version": {
+					"enum": [
+						"Merlin 8",
+						"Merlin 16",
+						"Merlin 16+",
+						"Merlin 32"
+					],
+					"default": "Merlin 8",
+					"markdownDescription": "Accept syntax for this version of Merlin"
+				},
+				"merlin6502.linker.detect": {
+					"type": "number",
+					"default": 0.1,
+					"minimum": 0,
+					"maximum": 1,
+					"markdownDescription": "Threshold to trigger interpretation as a linker command file.  This is the ratio of occurrences of ASM, LNK, or LKV, to lines in the document."
 				},
 				"merlin6502.completions.ibas": {
 					"type": "boolean",
@@ -81,6 +117,10 @@
 				"title": "merlin6502: Format for copy and paste into Merlin 8"
 			},
 			{
+				"command": "merlin6502.columns",
+				"title": "merlin6502: Resize columns" 
+			},
+			{
 				"command": "merlin6502.getFrontVii",
 				"title": "merlin6502: Insert from Virtual ][ front machine"
 			},
@@ -93,6 +133,10 @@
 			"commandPalette": [
 				{
 					"command": "merlin6502.format",
+					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.columns",
 					"when": "editorLangId == merlin6502"
 				},
 				{

@@ -300,10 +300,10 @@ describe('6502 Disassembly: short ops', async function() {
         assert.strictEqual(actualCode,expectedCode);
 	});
 	it('other', async function() {
-        const hexInput = '00EA';
+        const hexInput = '0000EA';
         const binaryInput = Buffer.from(hexInput,"hex");
         const expectedCode =
-            '\tBRK\n' +
+            '\tBRK\t#$00\n' +
             '\tNOP\n';
         const actualCode = this.disTool.disassemble(binaryInput,[0,hexInput.length/2],0,'none');
         assert.strictEqual(actualCode,expectedCode);

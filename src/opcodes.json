@@ -587,11 +587,11 @@
     },
     "brk": {
         "alt": [],
-        "brief": "branch on zero",
-        "desc": "branch if the Z status bit is set",
+        "brief": "force break",
+        "desc": "force break",
         "modes": [
             {
-                "addr_mnemonic": "impl",
+                "addr_mnemonic": "imm",
                 "code": 0,
                 "cycles": 7,
                 "processors": [
@@ -606,7 +606,7 @@
             "6502",
             "65c02"
         ],
-        "status": "----01--"
+        "status": "---b01--"
     },
     "brl": {
         "alt": [],
@@ -921,7 +921,7 @@
         "desc": "co-processor",
         "modes": [
             {
-                "addr_mnemonic": "s",
+                "addr_mnemonic": "zp",
                 "code": 2,
                 "cycles": 7,
                 "processors": [
@@ -2061,7 +2061,7 @@
         "desc": "push absolute address",
         "modes": [
             {
-                "addr_mnemonic": "s",
+                "addr_mnemonic": "abs",
                 "code": 244,
                 "cycles": 5,
                 "processors": [
@@ -2080,7 +2080,7 @@
         "desc": "push indirect address",
         "modes": [
             {
-                "addr_mnemonic": "s",
+                "addr_mnemonic": "(zp)",
                 "code": 212,
                 "cycles": 6,
                 "processors": [
@@ -2099,7 +2099,7 @@
         "desc": "push program counter relative address",
         "modes": [
             {
-                "addr_mnemonic": "s",
+                "addr_mnemonic": "abs",
                 "code": 98,
                 "cycles": 6,
                 "processors": [

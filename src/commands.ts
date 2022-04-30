@@ -21,23 +21,6 @@ type OpData =
 	immediate : boolean
 }
 
-/// return a range that expands the selection minimally to encompass complete lines
-function extended_selection(textEditor: vscode.TextEditor) : vscode.Range | undefined
-{
-	const sel = textEditor.selection;
-	if (!sel.isEmpty)
-	{
-		const ext_start = new vscode.Position(sel.start.line,0);
-		let ext_end = undefined;
-		if (sel.end.character==0)
-			ext_end = textEditor.document.lineAt(sel.end.line-1).range.end;
-		else
-			ext_end = textEditor.document.lineAt(sel.end.line).range.end;
-		return new vscode.Range(ext_start,ext_end);
-	}
-	return undefined;
-}
-
 async function proceedDespiteErrors(document: vscode.TextDocument,actionDesc: string) : Promise<boolean>
 {
 	const collection = vscode.languages.getDiagnostics(document.uri);
@@ -62,6 +45,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 	disassemblyMap : Map<number,OpData>;
 	formattedLine = "";
 	formattedCode = "";
+	callToken = '\u0100';
 	persistentSpace = '\u0100';
 	constructor(TSInitResult : [Parser,Parser.Language,Parser.Language,boolean])
 	{
@@ -411,7 +395,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 			const tree = this.parse(this.formattedLine,"\n");
 			this.walk(tree,this.format_node.bind(this));
 			this.formattedCode += this.formattedLine.
-				replace(/^\u0100/,'').
+				replace(RegExp('^'+this.callToken),'').
 				replace(/\s+/g,' ').
 				replace(RegExp(this.persistentSpace,'g'),' ');
 			this.formattedCode += '\n';
@@ -419,5 +403,55 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		vscode.workspace.openTextDocument({content:this.formattedCode,language:'merlin6502'}).then(doc => {
 			vscode.window.showTextDocument(doc);
 		});
+	}
+	async resizeColumns()
+	{
+		let verified = this.verify_document();
+		if (!verified)
+			return;
+		const proceed = await proceedDespiteErrors(verified.doc,'Formatting');
+		if (!proceed)
+			return;
+		const widths = [
+			this.config.get('columns.c1') as number,
+			this.config.get('columns.c2') as number,
+			this.config.get('columns.c3') as number
+		]
+		verified = this.verify_document();
+		if (!verified)
+			return;
+		this.GetLabels(verified.doc);
+		const sel = verified.ed.selection;
+		let formattedDoc = ''
+		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
+		{
+			if (sel.isEmpty || (this.row>=sel.start.line && this.row<sel.end.line))
+			{
+				this.formattedLine = this.AdjustLine(verified.doc);
+				const tree = this.parse(this.formattedLine,"\n");
+				this.walk(tree,this.format_node.bind(this));
+				this.formattedLine = this.formattedLine.replace(RegExp('^'+this.callToken),'').replace(/\s+/g,' ');
+				const cols = this.formattedLine.split(' ');
+				this.formattedLine = '';
+				for (let i=0;i<cols.length;i++)
+				{
+					let prepadding = 0;
+					if (cols[i].charAt(0)==';')
+						for (let j=i;j<3;j++)
+							prepadding += widths[j];
+					const padding = widths[i] - cols[i].length;
+					this.formattedLine += ' '.repeat(prepadding) + cols[i] + (padding>0 ? ' '.repeat(padding) : ' ');
+				}
+				this.formattedLine = this.formattedLine.trimEnd().replace(RegExp(this.persistentSpace,'g'),' ');
+				formattedDoc += this.formattedLine;
+			}
+			else
+				formattedDoc += verified.doc.lineAt(this.row).text;
+			if (this.row<verified.doc.lineCount-1)
+				formattedDoc += '\n'
+		}
+		const start = new vscode.Position(0,0);
+		const end = new vscode.Position(verified.doc.lineCount,0);
+		verified.ed.edit( edit => { edit.replace(new vscode.Range(start,end),formattedDoc) } );
 	}
 }

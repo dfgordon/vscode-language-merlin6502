@@ -20,9 +20,14 @@ export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vsco
 	process_node(curs: Parser.TreeCursor): lxbase.WalkerChoice
 	{
 		const rng = this.curs_to_range(curs,this.row,this.col);
-		if (["global_label","current_addr"].indexOf(curs.nodeType)>-1)
+		if (curs.currentFieldName()=='mac')
 		{
 			this.tokensBuilder.push(rng,"macro",[]);
+			return lxbase.WalkerOptions.gotoSibling;
+		}
+		if (["global_label","current_addr"].indexOf(curs.nodeType)>-1)
+		{
+			this.tokensBuilder.push(rng,"enum",[]);
 			return lxbase.WalkerOptions.gotoSibling;
 		}
 		if (curs.nodeType=="local_label")
@@ -55,7 +60,7 @@ export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vsco
 			this.tokensBuilder.push(rng,"keyword",[]);
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (curs.nodeType=="imm_prefix" || curs.nodeType=="addr_prefix")
+		if (["imm_prefix","addr_prefix","num_str_prefix"].indexOf(curs.nodeType)>-1)
 		{
 			this.tokensBuilder.push(rng,"keyword",[]);
 			return lxbase.WalkerOptions.gotoSibling;
@@ -81,6 +86,8 @@ export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vsco
 	{
 		this.tokensBuilder = new vscode.SemanticTokensBuilder(legend);
 		this.GetLabels(document);
+		if (this.get_interpretation(document)=='linker')
+			return null;
 		for (this.row=0;this.row<document.lineCount;this.row++)
 		{
 			const tree = this.parse(this.AdjustLine(document),"\n");

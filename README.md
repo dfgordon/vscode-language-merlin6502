@@ -2,11 +2,10 @@
 
 ![unit tests](https://github.com/dfgordon/vscode-language-merlin6502/actions/workflows/node.js.yml/badge.svg)
 
-Language support for Merlin 8/16 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
+Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-Support for Merlin 16+ and [Merlin 32](https://brutaldeluxe.fr/products/crossdevtools/merlin/) is not included at present.
-
-* Semantic highlights true to Merlin 8/16 syntax
+* Conforms to choice of Merlin version and processor target
+* Semantic highlights true to Merlin syntax
 * Completions and hovers for all operations and pseudo-operations
 * Completions and hovers for Apple II soft switches, ROM routines, etc.
 * Insert disassembly from emulator memory
@@ -18,34 +17,50 @@ Support for Merlin 16+ and [Merlin 32](https://brutaldeluxe.fr/products/crossdev
 
 <img src="sample/demo-merlin.gif" alt="session capture"/>
 
+## Merlin Syntax Settings
+
+Use extension settings (`Ctrl+Comma`, `Extensions`, `merlin6502`) to select the Merlin version.  This allows the extension to provide targeted diagnostics and completions.
+
+There are a few syntax rules that are *always* enforced by the extension, and which may be more restrictive than a given Merlin version:
+
+* All delimited strings ("dstrings") must be terminated
+* The characters `;[{}<>=` cannot be used in any label
+* The character `]` cannot be used in any label, except to start a variable
+
 ## About Columns and Case
 
-Assembly language is organized into lines and columns.  Merlin source files use a single space as the column separator, even though the Merlin editor displays columns at tab stops.  This extension will accept any combination of spaces and tabs as the column separator.  You can set the indentation (`Ctrl+P` -> `Indent Using ...`) to 9 in order to mimic the *display* layout of the Merlin 8 editor.
+Assembly language is organized into lines and columns.  Merlin source files use a single space as the column separator, even though the Merlin editor displays columns at tab stops.  This extension will accept any combination of spaces and tabs as the column separator.  Setting the indentation (`Ctrl+P` -> `Indent Using ...`) to 8 is a fair choice if you want to use tabs for column positioning.  There is a setting for variable column widths, along with an associated command `Ctrl+P` -> `merlin6502: Resize columns`.  This will be applied to the current selection, or the whole document if the selection is empty.
 
-Merlin labels are case sensitive, while instruction and pseudo-instruction mnemonics are not.  If you want to consider lower case mnemonics an error there is a setting.  When pasting code into Merlin, auto-capitalization settings within Merlin may take effect.
+Merlin labels are case sensitive, while instruction and pseudo-instruction mnemonics are not.  There are settings to control the behavior of completions and diagnostics with respect to case.  When pasting code into Merlin, auto-capitalization settings within Merlin may take effect.
 
 ## Apple ][ Special Addresses
 
 The extension knows hundreds of special address locations relevant to Integer BASIC, Applesoft, DOS 3.3, ProDOS, and the Apple ][ ROM.  Hovering over a literal address will display information about any address in the database.  Completions for special addresses are triggered when `$` is entered in the operand column following `EQU` or `=`.
 
-## Merlin 8/16 Syntax
+## Operand Completions
 
-The aim is to emulate Merlin syntax exactly. As of this writing, the following are known exceptions:
+If you want to be offered completions for available addressing modes or certain pseudo-op arguments, press space after accepting the completion in the instruction column.  Select the operand you want, and tab your way through the resulting snippet in the usual VS Code fashion.  You can use `merlin6502: Resize columns` periodically to move completed operands to the tab stop.
 
-* All delimited strings ("dstrings") must be terminated
-* Semicolons cannot be used in any label
-* The opening bracket `[` cannot be used in any label
-* The closing bracket `]` cannot be used in any label, other than as the leading character in a variable
+If you do *not* want to be troubled by operand completions, press tab instead of space, after accepting the instruction.
+
+## Linker Command Files
+
+Merlin linker command files are very similar to source files.  The extension will try to detect linker command files, and treat them specially.  As of this writing, the special treatment is simply turning off certain language services.  The detection threshold for linker commands can be adjusted in settings.
 
 ## Processor target and the XC pseudo-operation
 
-In the spirit of the original Merlin, we rely on the `XC` pseudo-operation to enable or disable the various operations and addressing modes associated with the different processor variants. The rules are simple:
+In the spirit of the original Merlin, we rely on the `XC` pseudo-operation to enable or disable the various operations and addressing modes associated with the different processor variants. The rules depend on the Merlin version:
 
-* If there is no `XC` in the source, the target is the 6502
-* If there is one `XC` at the beginning of the source, the target is the 65C02
-* If there are two consecutive `XC` at the beginning of the source, the target is the 65802 (Merlin 8) or 65816 (Merlin 16)
+* Merlin 8
+    - Default target = 6502
+    - `XC` sets target = 65C02
+    - `XC` twice sets target = 65802
+* Merlin 16/16+/32
+    - Default target = 65816
+    - `XC OFF` sets target = 6502
+    - `XC OFF` followed by `XC` sets target = 65C02
 
-This was the default behavior of Merlin 8.
+However, note that `XC OFF` was not introduced until Merlin 16+.
 
 ## PUT and USE files
 
@@ -56,16 +71,16 @@ The extension will register occurrences of includes (`PUT` and `USE`), but will 
 You can transfer code to and from the [AppleWin](https://github.com/AppleWin/AppleWin) emulator.
 
 * Transfer source to Merlin
-    - Format the source using `Ctrl-P` to select `merlin6502: Format for copy and paste into Merlin 8`
+    - Format the source using `Ctrl+P` to select `merlin6502: Format for copy and paste into Merlin 8`
     - Use the emulator's clipboard functionality to paste the formatted code directly into the Merlin editor
 * Insert Disassembly from emulator
     - From [AppleWin](https://github.com/AppleWin/AppleWin), create a save state file by pressing `F11`
-    - Return to VS Code, position the cursor at the insertion point, and use `Ctrl-P` to select `merlin6502: Insert from AppleWin save state`
+    - Return to VS Code, position the cursor at the insertion point, and use `Ctrl+P` to select `merlin6502: Insert from AppleWin save state`
     - Select `Disassembly` and respond to the subsequent prompts
     - Select the save state file
 * Insert Merlin Source
     - Open the source file in Merlin and create a save state file by pressing `F11`
-    - Return to VS Code, position the cursor at the insertion point, and use `Ctrl-P` to select `merlin6502: Insert from AppleWin save state`
+    - Return to VS Code, position the cursor at the insertion point, and use `Ctrl+P` to select `merlin6502: Insert from AppleWin save state`
     - Select `Merlin Source`
     - Select the save state file
 
@@ -76,21 +91,24 @@ Operations with the state file are the same on any platform, but [AppleWin](http
 You can transfer code to and from the [Virtual \]\[](https://virtualii.com) emulator.
 
 * Transfer source to Merlin
-    - Format the source using `Ctrl-P` to select `merlin6502: Format for copy and paste into Merlin 8`
+    - Format the source using `Cmd+P` to select `merlin6502: Format for copy and paste into Merlin 8`
     - Use the emulator's clipboard functionality to paste the formatted code directly into the Merlin editor
 * Insert Disassembly
     - Put the emulator in the desired state and leave it running
-    - Return to VS Code, position the cursor at the insertion point, and use `Ctrl-P` to select `merlin6502: Insert from Virtual ][ front machine`
+    - Return to VS Code, position the cursor at the insertion point, and use `Cmd+P` to select `merlin6502: Insert from Virtual ][ front machine`
     - Select `Disassembly` and respond to the subsequent prompts
 * Insert Merlin Source
     - Open the source file in Merlin and leave the emulator running
-    - Return to VS Code, position the cursor at the insertion point, and use `Ctrl-P` to select `merlin6502: Insert from Virtual ][ front machine`
+    - Return to VS Code, position the cursor at the insertion point, and use `Cmd+P` to select `merlin6502: Insert from Virtual ][ front machine`
     - Select `Merlin Source`
 
 This capability only applies to MacOS. Note that [Virtual \]\[](https://virtualii.com) is not part of the extension, and must be installed separately.
 
 ## Troubleshooting Tips
 
+* VS Code
+    - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
+    - tab your way to the end of snippets
 * Disassembly
     - verify that the starting address is aligned with an instruction opcode
     - stop disassembly before start of data

@@ -10,6 +10,7 @@ describe('Diagnostics: Processors', async function() {
 		this.prov = new diagnostics.TSDiagnosticProvider(TSInitResult);
 	});
 	it('65c02 disabled', async function() {
+		const v = vscode.workspace.getConfiguration('merlin6502')?.get('version');
 		const doc = await vscode.workspace.openTextDocument({content:' LDA #$00\n BRA 10',language:'merlin6502'});
 		const ed = await vscode.window.showTextDocument(doc);
 		if (!ed)
@@ -20,14 +21,23 @@ describe('Diagnostics: Processors', async function() {
 			if (collection[0]!=doc.uri)
 				continue;
 			const diagList = collection[1];
-			assert.strictEqual(diagList.length,2);
-			assert.match(diagList[0].message,/macro is undefined.*/);
-			assert.match(diagList[1].message,/macro name matches a disabled instruction.*/);
+			if (v && v=='Merlin 8') {
+				assert.strictEqual(diagList.length,2);
+				assert.match(diagList[0].message,/macro is undefined.*/);
+				assert.match(diagList[1].message,/macro name matches a disabled instruction.*/);
+			}
+			else if (v) {
+				assert.strictEqual(diagList.length,0);
+			}
+			else {
+				assert.fail('could not get configuration');
+			}
 		}
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});
 	it('65816 disabled', async function() {
+		const v = vscode.workspace.getConfiguration('merlin6502')?.get('version');
 		const doc = await vscode.workspace.openTextDocument({content:' XC\n LDA #$00\n BRA 10\n LDA [0]\n',language:'merlin6502'});
 		const ed = await vscode.window.showTextDocument(doc);
 		if (!ed)
@@ -38,8 +48,17 @@ describe('Diagnostics: Processors', async function() {
 			if (collection[0]!=doc.uri)
 				continue;
 			const diagList = collection[1];
-			assert.strictEqual(diagList.length,1);
-			assert.match(diagList[0].message,/addressing mode disabled.*/);
+			if (v && v=='Merlin 8') {
+				assert.strictEqual(diagList.length,1);
+				assert.match(diagList[0].message,/addressing mode disabled/);
+				}
+			else if (v) {
+				assert.strictEqual(diagList.length,1);
+				assert.match(diagList[0].message,/XC count/);
+			}
+			else {
+				assert.fail('could not get configuration');
+			}
 		}
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
@@ -51,6 +70,24 @@ describe('Diagnostics: Macros', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
 		this.prov = new diagnostics.TSDiagnosticProvider(TSInitResult);
+	});
+	it('matches instruction', async function() {
+		const doc = await vscode.workspace.openTextDocument({content:'LDA MAC\nDO MAC\nLDX LDA #$00',language:'merlin6502'});
+		const ed = await vscode.window.showTextDocument(doc);
+		if (!ed)
+			assert.fail('no active text editor');
+		const collections = vscode.languages.getDiagnostics();
+		for (const collection of collections)
+		{
+			if (collection[0]!=doc.uri)
+				continue;
+			const diagList = collection[1];
+			assert.strictEqual(diagList.length,2);
+			assert.match(diagList[0].message,/macro name matches a mnemonic/);
+			assert.match(diagList[1].message,/macro name matches a mnemonic/);
+		}
+		while (vscode.window.activeTextEditor)
+			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});
 	it('undefined macro', async function() {
 		const doc = await vscode.workspace.openTextDocument({content:' mymac1 00;01\n PMC mac2\n >>> mac3,00',language:'merlin6502'});
@@ -256,7 +293,7 @@ describe('Diagnostics: locals', async function() {
 		this.prov = new diagnostics.TSDiagnosticProvider(TSInitResult);
 	});
 	it('no scope', async function() {
-		const doc = await vscode.workspace.openTextDocument({content:':G1 EQU $00',language:'merlin6502'});
+		const doc = await vscode.workspace.openTextDocument({content:':G1 LDA $00',language:'merlin6502'});
 		const ed = await vscode.window.showTextDocument(doc);
 		if (!ed)
 			assert.fail('no active text editor');
@@ -273,7 +310,7 @@ describe('Diagnostics: locals', async function() {
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});
 	it('forbidden pseudo-op', async function() {
-		const doc = await vscode.workspace.openTextDocument({content:'SCOPE\n:loc1 MAC\n:loc2 EQU $00\n:loc3 ENT\n:loc4 EXT',language:'merlin6502'});
+		const doc = await vscode.workspace.openTextDocument({content:'SCOPE\n:loc2 EQU $00\n:loc3 ENT\n:loc4 EXT',language:'merlin6502'});
 		const ed = await vscode.window.showTextDocument(doc);
 		if (!ed)
 			assert.fail('no active text editor');
@@ -283,7 +320,7 @@ describe('Diagnostics: locals', async function() {
 			if (collection[0]!=doc.uri)
 				continue;
 			const diagList = collection[1];
-			assert.strictEqual(diagList.length,4);
+			assert.strictEqual(diagList.length,3);
 			assert.match(diagList[0].message,/cannot use local.*/);
 		}
 		while (vscode.window.activeTextEditor)

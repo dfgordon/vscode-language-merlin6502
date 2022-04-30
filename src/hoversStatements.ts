@@ -5,7 +5,17 @@ import * as pseudo from './pseudo_opcodes.json';
 function exampleString(examples: string[]) : vscode.MarkdownString
 {
 	const result = new vscode.MarkdownString();
+	result.appendMarkdown('**Examples**');
 	examples.forEach(s => result.appendCodeblock(s,'merlin6502'));
+	return result;
+}
+
+function headingString(psop: string,alt: string[]|undefined) : vscode.MarkdownString
+{
+	const result = new vscode.MarkdownString();
+	result.appendMarkdown('`'+psop.toUpperCase()+'`');
+	if (alt)
+		alt.forEach(s => result.appendMarkdown('or `'+s.toUpperCase()+'`'));
 	return result;
 }
 
@@ -27,7 +37,7 @@ export class OpcodeHovers
 			for (const mode of modeList)
 			{
 				const addr_mnemonic = (mode.addr_mnemonic as string).padEnd(8,' ');
-				const code = '$'+(mode.code as number).toString(16).toUpperCase();
+				const code = '$'+(mode.code as number).toString(16).toUpperCase().padStart(2,'0');
 				const cyc = (mode.cycles as number).toString();
 				let proc = '';
 				if (!mode.processors.includes('6502'))
@@ -72,9 +82,13 @@ export class PseudoOpcodeHovers
 	{
 		const ans = new Array<vscode.MarkdownString>();
 		const obj = Object(pseudo)[psop];
-		ans.push(new vscode.MarkdownString('`'+psop.toUpperCase()+'`'));
+		ans.push(headingString(psop,obj.alt));
 		ans.push(new vscode.MarkdownString(obj.desc));
-		let v = 'Merlin versions: '
+		if (obj.eg)
+			ans.push(exampleString(obj.eg));
+		if (obj.caveat)
+			ans.push(new vscode.MarkdownString('n.b. '+obj.caveat));
+		let v = 'Merlin versions: ';
 		const vmap = obj.version;
 		if (vmap)
 			for (const it of vmap)
