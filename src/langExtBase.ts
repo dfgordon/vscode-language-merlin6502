@@ -14,27 +14,23 @@ export const WalkerOptions = {
 
 export type WalkerChoice = typeof WalkerOptions[keyof typeof WalkerOptions];
 
-function get_lang_path(caseSens: boolean|undefined) : string
+function get_lang_path() : string
 {
 	let lang = 'tree-sitter-merlin6502';
-	if (caseSens)
-		lang += 'casesens';
 	return path.join(__dirname,lang+'.wasm');
 }
 
-export async function TreeSitterInit(): Promise<[Parser,Parser.Language,Parser.Language,boolean]>
+/// Returns a parser and language.  The language is redundant at present,
+/// but someday we may want to return a linker command parser, or separate
+/// out Merlin versions as distinct parsers.
+export async function TreeSitterInit(): Promise<[Parser,Parser.Language]>
 {
 	const config = vscode.workspace.getConfiguration('merlin6502');
-	const caseSens = (c => c==undefined?false:c)(config.get('case.caseSensitive')); 
 	await Parser.init();
 	const parser = new Parser();
-	const Merlin6502 = await Parser.Language.load(get_lang_path(false));
-	const Merlin6502CaseSens = await Parser.Language.load(get_lang_path(true));
-	if (caseSens)
-		parser.setLanguage(Merlin6502CaseSens);
-	else
-		parser.setLanguage(Merlin6502);
-	return [parser,Merlin6502,Merlin6502CaseSens,caseSens];
+	const Merlin6502 = await Parser.Language.load(get_lang_path());
+	parser.setLanguage(Merlin6502);
+	return [parser,Merlin6502];
 }
 
 export class LabelSet
@@ -72,9 +68,7 @@ export class LangExtBase
 {
 	parser : Parser;
 	Merlin6502 : Parser.Language;
-	Merlin6502CaseSens : Parser.Language;
 	config : vscode.WorkspaceConfiguration;
-	caseSens: boolean;
 	labels: LabelSet;
 	opExactPattern : RegExp;
 	psopExactPattern : RegExp;
@@ -86,12 +80,11 @@ export class LangExtBase
 	xcCount = 0;
 	merlinVersion = 'v8';
 	linkerCount = 0;
-	constructor(TSInitResult : [Parser,Parser.Language,Parser.Language,boolean])
+	caseSens = false;
+	constructor(TSInitResult : [Parser,Parser.Language])
 	{
 		this.parser = TSInitResult[0];
 		this.Merlin6502 = TSInitResult[1];
-		this.Merlin6502CaseSens = TSInitResult[2];
-		this.caseSens = TSInitResult[3];
 		this.labels = new LabelSet;
 		this.opExactPattern = /ADC/;
 		this.psopExactPattern = /MAC/;
@@ -191,15 +184,7 @@ export class LangExtBase
 	parse(txt: string,append: string) : Parser.Tree
 	{
 		this.config = vscode.workspace.getConfiguration('merlin6502');
-		const caseSens = (c => c==undefined?false:c)(this.config.get('case.caseSensitive')); 
-		if (caseSens!=this.caseSens)
-		{
-			this.caseSens = caseSens;
-			if (caseSens)
-				this.parser.setLanguage(this.Merlin6502CaseSens);
-			else
-				this.parser.setLanguage(this.Merlin6502);
-		}
+		this.caseSens = (c => c==undefined?false:c)(this.config.get('case.caseSensitive'));
 		return this.parser.parse(txt+append);
 	}
 	walk(syntaxTree: Parser.Tree,visit: (node: Parser.TreeCursor) => WalkerChoice) : WalkerChoice

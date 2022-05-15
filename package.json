@@ -1,7 +1,7 @@
 {
 	"name": "vscode-language-merlin6502",
 	"displayName": "Merlin 6502",
-	"description": "Language support for Merlin 8/16 for 6502 family of processors",
+	"description": "Merlin assembly language for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
 	"version": "0.2.0",
 	"license": "GPL-3.0-only",

@@ -252,9 +252,7 @@ class LabelSentry
 		else if (curr.type=='global_label' && curs.currentFieldName()=='mac')
 		{
 			const count = diag.length;
-			if (parent && parent.type.substring(0,10)=='macro_call' && curr.text.match(this.opExactPattern) || curr.text.match(this.psopExactPattern))
-				diag.push(new vscode.Diagnostic(rng,'settings require mnemonic to be upper case',vscode.DiagnosticSeverity.Error)); // in case parser is case sensitive
-			else if (!this.labels.macros.has(curr.text) && this.labels.globals.has(curr.text))
+			if (!this.labels.macros.has(curr.text) && this.labels.globals.has(curr.text))
 				diag.push(new vscode.Diagnostic(rng,'expected macro, this is a label',vscode.DiagnosticSeverity.Error));
 			else if (!this.labels.macros.has(curr.text) && this.useFiles>0)
 				diag.push(new vscode.Diagnostic(rng,'macro might be undefined',vscode.DiagnosticSeverity.Warning));
@@ -316,7 +314,7 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 	psopSentry : PseudoOpSentry;
 	labelSentry : LabelSentry;
 	diag : Array<vscode.Diagnostic>;
-	constructor(TSInitResult : [Parser,Parser.Language,Parser.Language,boolean])
+	constructor(TSInitResult : [Parser,Parser.Language])
 	{
 		super(TSInitResult);
 		this.procSentry = new ProcessorModeSentry(this.merlinVersion);
@@ -356,6 +354,7 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 	}
 	visit_verify(curs: Parser.TreeCursor): lxbase.WalkerChoice
 	{
+		const dstring_psops = ['psop_asc','psop_dci','psop_inv','psop_fls','psop_rev','psop_str','psop_strl']
 		const rng = this.curs_to_range(curs,this.row,this.col);
 		this.labelSentry.visit_verify(this.diag,curs,rng);
 		this.procSentry.visit(this.diag,curs,rng);
@@ -373,12 +372,31 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 			if (child && child.type=="anyfs")
 				this.diag.push(new vscode.Diagnostic(rng,'incorrect syntax',vscode.DiagnosticSeverity.Error));
 		}
+		if (this.caseSens && (curs.currentNode().type.substring(0,3)=='op_' || curs.currentNode().type.substring(0,5)=='psop_'))
+		{
+			if (curs.nodeText != curs.nodeText.toUpperCase())
+				this.diag.push(new vscode.Diagnostic(rng,'settings require uppercase mnemonics',vscode.DiagnosticSeverity.Error));
+		}
 		if (curs.currentNode().type=='num_str_prefix' && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
 			this.diag.push(new vscode.Diagnostic(rng,'numerical string prefix requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
 		if (curs.currentNode().type=='braced_aexpr' && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
 			this.diag.push(new vscode.Diagnostic(rng,'braced expressions require Merlin 16+/32',vscode.DiagnosticSeverity.Error));
 		if (curs.currentNode().type.substring(0,4)=="cop_" && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
 			this.diag.push(new vscode.Diagnostic(rng,'operator requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
+		if (dstring_psops.includes(curs.currentNode().type) && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
+		{
+			let curr = curs.currentNode().nextNamedSibling;
+			let count = 0;
+			let newRng = rng;
+			while (curr) {
+				newRng = this.node_to_range(curr,this.row,this.col);
+				if (curr.type=='dstring' || curr.type=='hex_data')
+					count++;
+				curr = curr.nextNamedSibling;
+			}
+			if (count>2)
+				this.diag.push(new vscode.Diagnostic(newRng,'extended string operand requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
+		}
 		if (curs.currentNode().type=="dstring" && this.merlinVersion=='v32')
 		{
 			const delim = curs.nodeText.charAt(0);

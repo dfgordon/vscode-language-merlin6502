@@ -47,7 +47,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 	formattedCode = "";
 	callToken = '\u0100';
 	persistentSpace = '\u0100';
-	constructor(TSInitResult : [Parser,Parser.Language,Parser.Language,boolean])
+	constructor(TSInitResult : [Parser,Parser.Language])
 	{
 		super(TSInitResult);
 		// This map creates a string where we can simply search for a number,
