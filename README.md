@@ -26,10 +26,13 @@ There are a few syntax rules that are *always* enforced by the extension, and wh
 * All delimited strings ("dstrings") must be terminated
 * The characters `;[{}<>=` cannot be used in any label
 * The character `]` cannot be used in any label, except to start a variable
+* If the whole line is a comment, the first character must be `*`
 
 ## About Columns and Case
 
 Assembly language is organized into lines and columns.  Merlin source files use a single space as the column separator, even though the Merlin editor displays columns at tab stops.  This extension will accept any combination of spaces and tabs as the column separator.  Setting the indentation (`Ctrl+P` -> `Indent Using ...`) to 8 is a fair choice if you want to use tabs for column positioning.  There is a setting for variable column widths, along with an associated command `Ctrl+P` -> `merlin6502: Resize columns`.  This will be applied to the current selection, or the whole document if the selection is empty.
+
+The use of flexible column separators means that if some columns are empty, context-free counting of columns is not possible.  In practice, all you have to keep in mind is that comments must appear *last*, rather than in a particular column.
 
 Merlin labels are case sensitive, while instruction and pseudo-instruction mnemonics are not.  There are settings to control the behavior of completions and diagnostics with respect to case.  When pasting code into Merlin, auto-capitalization settings within Merlin may take effect.
 

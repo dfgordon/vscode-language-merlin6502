@@ -354,6 +354,7 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 	}
 	visit_verify(curs: Parser.TreeCursor): lxbase.WalkerChoice
 	{
+		const maxLabLen = this.merlinVersion=='v8' ? 13 : 26;
 		const dstring_psops = ['psop_asc','psop_dci','psop_inv','psop_fls','psop_rev','psop_str','psop_strl']
 		const rng = this.curs_to_range(curs,this.row,this.col);
 		this.labelSentry.visit_verify(this.diag,curs,rng);
@@ -387,14 +388,20 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 		{
 			let curr = curs.currentNode().nextNamedSibling;
 			let count = 0;
-			let newRng = rng;
+			let newRng : vscode.Range | undefined = undefined;
 			while (curr) {
-				newRng = this.node_to_range(curr,this.row,this.col);
+				const rngNow = this.node_to_range(curr,this.row,this.col);
 				if (curr.type=='dstring' || curr.type=='hex_data')
+				{
+					if (newRng)
+						newRng = newRng.union(rngNow);
+					else
+						newRng = rngNow; 
 					count++;
+				}
 				curr = curr.nextNamedSibling;
 			}
-			if (count>2)
+			if (count>2 && newRng)
 				this.diag.push(new vscode.Diagnostic(newRng,'extended string operand requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
 		}
 		if (curs.currentNode().type=="dstring" && this.merlinVersion=='v32')
@@ -408,6 +415,47 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 			if (curs.nodeText.toUpperCase()!='L')
 				this.diag.push(new vscode.Diagnostic(rng,'Merlin 32 may not accept trailing characters',vscode.DiagnosticSeverity.Warning));
 		}
+		if (["global_label","local_label","var_label"].includes(curs.currentNode().type))
+		{
+			if (curs.currentNode().text.length > maxLabLen && this.merlinVersion!='v32')
+				this.diag.push(new vscode.Diagnostic(rng,"label is too long (max = "+maxLabLen+")",vscode.DiagnosticSeverity.Error));
+		}
+		if (curs.currentNode().type=="comment" && this.merlinVersion!='v32')
+		{
+			// there is a limit on the length of the third and fourth columns.
+			// if the parser provided column nodes this would be easier.
+			// n.b. there are some issues with using regex for this.
+			const curr = curs.currentNode();
+			const parent = curr.parent;
+			let c3 = ""; // our problem is to find this
+			if (parent)
+			{
+				let c2_search = "";
+				if (parent.type.substring(0,5)=="macro")
+					c2_search = "global_label";
+				else if (parent.type=="operation")
+					c2_search = "op_";
+				else if (parent.type=="pseudo_operation")
+					c2_search = "psop_";
+				if (c2_search.length>0)
+				{
+					let sib = parent.firstChild;
+					while (sib && sib.type.search(c2_search)==-1)
+						sib = sib.nextSibling; // will exit with the instruction
+					if (sib)
+						sib = sib.nextSibling; // move past instruction
+					while (sib && sib.type!='comment')
+					{
+						c3 += sib.text
+						sib = sib.nextSibling;
+					}
+				}
+			}
+			if (c3.length + curr.text.length > 64)
+				this.diag.push(new vscode.Diagnostic(rng,'columns 3 and 4 together are too long (max = 64)',vscode.DiagnosticSeverity.Error))
+		}
+		if (curs.currentNode().type=="main_comment" && curs.nodeText.length > 64 && this.merlinVersion!='v32')
+			this.diag.push(new vscode.Diagnostic(rng,'comment is too long (max = 64)',vscode.DiagnosticSeverity.Error))
 		return lxbase.WalkerOptions.gotoChild;
 	}
 	update(document : vscode.TextDocument, collection: vscode.DiagnosticCollection): void

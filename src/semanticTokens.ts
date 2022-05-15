@@ -75,7 +75,7 @@ export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vsco
 			this.tokensBuilder.push(rng,"string",[]);
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (["number","hex_byte"].indexOf(curs.nodeType)>-1)
+		if (["number","hex_data"].indexOf(curs.nodeType)>-1)
 		{
 			this.tokensBuilder.push(rng,"number",[]);
 			return lxbase.WalkerOptions.gotoSibling;

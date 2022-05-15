@@ -308,7 +308,7 @@ export class LangExtBase
 			const anyMatch = anyExactMatch || mnemonic.match(this.opPrefixPattern) || mnemonic.match(this.psopPrefixPattern)
 			if (this.labels.macros.has(mnemonic) && !anyExactMatch)
 				prefix = '\u0100';
-			if (!anyMatch)
+			if (!anyMatch && mnemonic[0]!=';')
 				prefix = '\u0100';
 		}
 		this.col = -prefix.length;
