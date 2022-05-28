@@ -3,7 +3,7 @@
 	"displayName": "Merlin 6502",
 	"description": "Merlin assembly language for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
-	"version": "0.2.2",
+	"version": "0.3.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
