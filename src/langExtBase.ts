@@ -14,10 +14,31 @@ export const WalkerOptions = {
 
 export type WalkerChoice = typeof WalkerOptions[keyof typeof WalkerOptions];
 
+export const SourceOptions = {
+	master: 0,
+	use: 1,
+	put: 2
+} as const;
+
+export type SourceType = typeof SourceOptions[keyof typeof SourceOptions];
+
 function get_lang_path() : string
 {
 	let lang = 'tree-sitter-merlin6502';
 	return path.join(__dirname,lang+'.wasm');
+}
+
+export async function LoadSources(doc: vscode.TextDocument): Promise<Array<vscode.Uri>>
+{
+	const workroot = vscode.workspace.getWorkspaceFolder(doc.uri);
+	if (workroot)
+	{
+		const patt = new vscode.RelativePattern(workroot,"**/*.S");
+		const excl = new vscode.RelativePattern(workroot,"**/node_modules/**");
+		const files = await vscode.workspace.findFiles(patt,excl);
+		return files;
+	}
+	return [];
 }
 
 /// Returns a parser and language.  The language is redundant at present,
@@ -33,48 +54,15 @@ export async function TreeSitterInit(): Promise<[Parser,Parser.Language]>
 	return [parser,Merlin6502];
 }
 
-export class LabelSet
-{
-	globals : Set<string>;
-	locals : Set<string>;
-	vars : Set<string>;
-	macros : Set<string>;
-	runningVars : Set<string>;
-	runningMacros : Set<string>;
-	constructor()
-	{
-		this.globals = new Set<string>();
-		this.locals = new Set<string>();
-		this.vars = new Set<string>();
-		this.macros = new Set<string>();
-		this.runningVars = new Set<string>();
-		this.runningMacros = new Set<string>();
-	}
-	add(labels:LabelSet)
-	{
-		this.globals = new Set([...this.globals,...labels.globals]);
-		this.locals = new Set([...this.locals,...labels.locals]);
-		this.vars = new Set([...this.vars,...labels.vars]);
-		this.macros = new Set([...this.macros,...labels.macros]);
-	}
-	add_running(labels:LabelSet)
-	{
-		this.runningVars = new Set([...this.runningVars,...labels.runningVars]);
-		this.runningMacros = new Set([...this.runningMacros,...labels.runningMacros]);
-	}
-}
-
 export class LangExtBase
 {
 	parser : Parser;
 	Merlin6502 : Parser.Language;
 	config : vscode.WorkspaceConfiguration;
-	labels: LabelSet;
 	opExactPattern : RegExp;
 	psopExactPattern : RegExp;
 	opPrefixPattern : RegExp;
 	psopPrefixPattern : RegExp;
-	currScope = '';
 	row = 0;
 	col = 0;
 	xcCount = 0;
@@ -85,7 +73,6 @@ export class LangExtBase
 	{
 		this.parser = TSInitResult[0];
 		this.Merlin6502 = TSInitResult[1];
-		this.labels = new LabelSet;
 		this.opExactPattern = /ADC/;
 		this.psopExactPattern = /MAC/;
 		this.opPrefixPattern = /ADC/;
@@ -103,7 +90,6 @@ export class LangExtBase
 			this.xcCount = 0;
 		else
 			this.xcCount = 2;
-		this.currScope = '';
 		this.linkerCount = 0;
 	}
 	get_interpretation(doc: vscode.TextDocument) : string
@@ -224,35 +210,9 @@ export class LangExtBase
 			return WalkerOptions.abort;
 		return WalkerOptions.gotoChild;
 	}
-	visitLabelDefs(curs: Parser.TreeCursor) : WalkerChoice
+	visit_properties(curs: Parser.TreeCursor) : WalkerChoice
 	{
 		const curr = curs.currentNode();
-		const child = curr.firstNamedChild;
-		const next = curr.nextNamedSibling;
-		if (child && curr.type=='label_def')
-		{
-			if (child.type=='global_label')
-			{
-				if (next && next.type=='psop_mac')
-				{
-					this.labels.macros.add(child.text);
-				}
-				else
-				{
-					this.labels.globals.add(child.text);
-					this.currScope = child.text;
-				}
-			}
-			if (child.type=='local_label')
-			{
-				this.labels.locals.add(this.currScope+'\u0100'+child.text);
-			}
-			if (child.type=='var_label')
-			{
-				this.labels.vars.add(child.text);
-			}
-			return WalkerOptions.gotoParentSibling;
-		}
 		if (curr.type=='psop_xc')
 		{
 			if (curr.nextSibling && curr.nextSibling.text.toUpperCase()=='OFF')
@@ -262,7 +222,7 @@ export class LangExtBase
 			if (this.xcCount>2)
 				this.xcCount = 2;
 		}
-		if (curr.type=='global_label' && curs.currentFieldName()=='mac' && ['LNK','LKV','ASM'].includes(curr.text.toUpperCase()))
+		if (curr.type=='label_ref' && curs.currentFieldName()=='mac' && ['LNK','LKV','ASM'].includes(curr.text.toUpperCase()))
 			this.linkerCount += 1;
 		return WalkerOptions.gotoChild;
 	}
@@ -276,24 +236,22 @@ export class LangExtBase
 				break;
 		}
 	}
-	GetLabels(document: vscode.TextDocument)
+	GetProperties(document: vscode.TextDocument)
 	{
 		this.reset();
-		this.labels = new LabelSet;
 		for (let row=0;row<document.lineCount;row++)
 		{
 			const programLine = document.lineAt(row).text;
 			const tree = this.parse(programLine,"\n");
-			this.walk(tree,this.visitLabelDefs.bind(this));
+			this.walk(tree,this.visit_properties.bind(this));
 		}
 		this.set_reserved_words();
-		this.currScope = ''; // avoid debugging confusion
 	}
 	/// AdjustLine is used to let the parser know when an item
 	/// in the operator column is a previously defined macro name.
 	/// The signal is unicode 0x100 at the start of the line.
 	/// GetLabels must be called before the first line is processed.
-	AdjustLine(document: vscode.TextDocument) : string
+	AdjustLine(document: vscode.TextDocument, macros: Map<string,any>) : string
 	{
 		// Doing this with regex only - have to be careful
 		const programLine = document.lineAt(this.row).text;
@@ -306,7 +264,7 @@ export class LangExtBase
 			const mnemonic = match[0].trim();
 			const anyExactMatch = mnemonic.match(this.opExactPattern) || mnemonic.match(this.psopExactPattern);
 			const anyMatch = anyExactMatch || mnemonic.match(this.opPrefixPattern) || mnemonic.match(this.psopPrefixPattern)
-			if (this.labels.macros.has(mnemonic) && !anyExactMatch)
+			if (macros.has(mnemonic) && !anyExactMatch)
 				prefix = '\u0100';
 			if (!anyMatch && mnemonic[0]!=';')
 				prefix = '\u0100';

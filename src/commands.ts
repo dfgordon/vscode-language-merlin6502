@@ -7,6 +7,7 @@ import * as path from 'path';
 import { platform } from 'os';
 import * as opcodes from './opcodes.json';
 import * as Parser from 'web-tree-sitter';
+import { LabelSentry } from './labels';
 
 type OpData =
 {
@@ -47,9 +48,11 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 	formattedCode = "";
 	callToken = '\u0100';
 	persistentSpace = '\u0100';
-	constructor(TSInitResult : [Parser,Parser.Language])
+	labelSentry : LabelSentry;
+	constructor(TSInitResult : [Parser,Parser.Language], sentry: LabelSentry)
 	{
 		super(TSInitResult);
+		this.labelSentry = sentry;
 		// This map creates a string where we can simply search for a number,
 		// and the number is the length of the binary data.  Furthermore,
 		// the value of the data replaces the number.
@@ -372,7 +375,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 	format_node(curs: Parser.TreeCursor) : lxbase.WalkerChoice
 	{
 		// Persistent spaces
-		if (['literal_arg','dstring','dos33','anyfs','literal','comment_text'].includes(curs.nodeType))
+		if (['literal_arg','dstring','dos33','literal','comment_text'].includes(curs.nodeType))
 			this.formattedLine = this.replace_curs(curs.nodeText.replace(/ /g,this.persistentSpace),curs);
 		return lxbase.WalkerOptions.gotoChild;
 	}
@@ -387,11 +390,11 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		verified = this.verify_document();
 		if (!verified)
 			return;
-		this.GetLabels(verified.doc);
+		this.GetProperties(verified.doc);
 		this.formattedCode = '';
 		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
 		{
-			this.formattedLine = this.AdjustLine(verified.doc);
+			this.formattedLine = this.AdjustLine(verified.doc,this.labelSentry.labels.macros);
 			const tree = this.parse(this.formattedLine,"\n");
 			this.walk(tree,this.format_node.bind(this));
 			this.formattedCode += this.formattedLine.
@@ -420,14 +423,14 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		verified = this.verify_document();
 		if (!verified)
 			return;
-		this.GetLabels(verified.doc);
+		this.GetProperties(verified.doc);
 		const sel = verified.ed.selection;
 		let formattedDoc = ''
 		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
 		{
 			if (sel.isEmpty || (this.row>=sel.start.line && this.row<sel.end.line))
 			{
-				this.formattedLine = this.AdjustLine(verified.doc);
+				this.formattedLine = this.AdjustLine(verified.doc,this.labelSentry.labels.macros);
 				const tree = this.parse(this.formattedLine,"\n");
 				this.walk(tree,this.format_node.bind(this));
 				this.formattedLine = this.formattedLine.replace(RegExp('^'+this.callToken),'').replace(/\s+/g,' ');

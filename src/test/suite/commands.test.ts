@@ -1,12 +1,14 @@
 import * as vscode from 'vscode';
 import * as lxbase from '../../langExtBase';
+import * as labels from '../../labels';
 import * as com from '../../commands';
 import * as assert from 'assert';
 
 describe('Commands: format', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		this.disTool = new com.DisassemblyTool(TSInitResult);
+		const labelSentry = new labels.LabelSentry(TSInitResult);
+		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
 	});
 	it('straight code', async function() {
         const testCode = '   LDA \t #$00\n\tBEQ\t10';

@@ -3,6 +3,8 @@ import * as specialAddresses from './specialAddresses.json';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
 import * as lxbase from './langExtBase';
+import * as Parser from 'web-tree-sitter';
+import { LabelSentry } from './labels';
 
 export class AddressCompletionProvider implements vscode.CompletionItemProvider
 {
@@ -89,6 +91,7 @@ export class AddressCompletionProvider implements vscode.CompletionItemProvider
 
 export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.CompletionItemProvider
 {
+	labelSentry : LabelSentry;
 	complMap = Object({
 		'imm': '#${0:imm}',
 		'abs': '${0:abs}',
@@ -115,6 +118,11 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 		'accum': '',
 		's': ''
 	});
+	constructor(TSInitResult : [Parser,Parser.Language], sentry: LabelSentry)
+	{
+		super(TSInitResult);
+		this.labelSentry = sentry;
+	}
 	modify(s:string)
 	{
 		if (this.config.get('case.lowerCaseCompletions') && !this.config.get('case.caseSensitive'))
@@ -238,7 +246,7 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 		const linePrefix = document.lineAt(position).text.substring(0,position.character);
 		if (linePrefix.charAt(0)=='*')
 			return undefined;
-		this.GetLabels(document);
+		this.GetProperties(document);
 		if (linePrefix.search(/^\S*\s+[A-Za-z]$/)>-1) // start of opcode column?
 		{
 			for (const k of Object.keys(opcodes))
@@ -247,22 +255,22 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 			for (const k of Object.keys(pseudo))
 				if (this.pseudoOpEnabled(Object(pseudo)[k].version))
 					simple.push(k);
-			for (const v of this.labels.macros)
+			for (const v in this.labelSentry.labels.macros)
 				label.add(v);
 		}
 		if (linePrefix.search(/^:$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+:$/)>-1) // pressed `:` in first or third column
 		{
-			for (const v of this.labels.locals)
+			for (const v in this.labelSentry.labels.locals)
 				label.add(v.substring(v.indexOf('\u0100')+1));
 		}
 		if (linePrefix.search(/^]$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+]$/)>-1) // pressed `]` in first or third column
 		{
-			for (const v of this.labels.vars)
+			for (const v in this.labelSentry.labels.vars)
 				label.add(v);
 		}
 		if (linePrefix.search(/^[a-zA-Z]$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+[a-zA-Z]$/)>-1) // pressed alpha in first or third column
 		{
-			for (const v of this.labels.globals)
+			for (const v in this.labelSentry.labels.globals)
 				label.add(v);
 		}
 		if (linePrefix.search(/^\S*\s+\S+\s+$/)>-1) // search for (pseudo)-instruction args upon space

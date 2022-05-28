@@ -5,8 +5,8 @@
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
 * Conforms to choice of Merlin version and processor target
-* Semantic highlights true to Merlin syntax
-* Completions and hovers for all operations and pseudo-operations
+* Resolves labels across project workspace
+* Comprehensive highlights, completions, and hovers
 * Completions and hovers for Apple II soft switches, ROM routines, etc.
 * Insert disassembly from emulator memory
 * Transfer source code to and from emulators
@@ -50,6 +50,18 @@ If you do *not* want to be troubled by operand completions, press tab instead of
 
 Merlin linker command files are very similar to source files.  The extension will try to detect linker command files, and treat them specially.  As of this writing, the special treatment is simply turning off certain language services.  The detection threshold for linker commands can be adjusted in settings.
 
+## Linker Modules
+
+The extension will verify that `EXT` and `EXD` labels are declared as `ENT` in another module.  It does not analyze linker command files for consistency, it only verifies that the external label has at least one corresponding entry label *somewhere* in the project.  Hovering over the external label shows the corresponding entries.
+
+## PUT and USE files
+
+The extension will fully analyze `PUT` and `USE` includes, assuming it can find the referenced files.  The way the file search works is as follows.  The referenced file in column 3 is assumed to be a ProDOS pathname. The filename is extracted, and a search in the project workspace is carried out for a `.S` file with the same name.  The first match is analyzed.  The following should be noted:
+
+* The ProDOS path and the VS Code project path do not need to match in any way
+* If more than one file match is found, the extension will flag it as an error
+* The file extension should *not* be included in the pseudo-op argument
+
 ## Processor target and the XC pseudo-operation
 
 In the spirit of the original Merlin, we rely on the `XC` pseudo-operation to enable or disable the various operations and addressing modes associated with the different processor variants. The rules depend on the Merlin version:
@@ -64,10 +76,6 @@ In the spirit of the original Merlin, we rely on the `XC` pseudo-operation to en
     - `XC OFF` followed by `XC` sets target = 65C02
 
 However, note that `XC OFF` was not introduced until Merlin 16+.
-
-## PUT and USE files
-
-The extension will register occurrences of includes (`PUT` and `USE`), but will not parse the referenced files.  If the extension finds an undefined label that follows an include, it will be underlined with a warning, rather than an error, since the definition might be in the include.  In making this calculation the extension assumes that `PUT` files do *not* contain macros, per the usual Merlin rules.
 
 ## Using with AppleWin
 

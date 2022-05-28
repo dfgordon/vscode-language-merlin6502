@@ -2,16 +2,24 @@ import * as vscode from 'vscode';
 import Parser from 'web-tree-sitter';
 import { AddressHovers } from './hoversAddresses';
 import { OpcodeHovers, PseudoOpcodeHovers } from './hoversStatements';
+import { LabelSentry } from './labels';
 import * as lxbase from './langExtBase';
 
 export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverProvider
 {
+	labelSentry : LabelSentry;
 	addresses = new AddressHovers();
 	opcodes = new OpcodeHovers();
 	pseudo = new PseudoOpcodeHovers();
 	hover = new Array<vscode.MarkdownString>();
 	position = new vscode.Position(0,0);
 	range = new vscode.Range(new vscode.Position(0,0),new vscode.Position(0,0));
+	currDoc : vscode.TextDocument | null = null;
+	constructor(TSInitResult : [Parser,Parser.Language], sentry: LabelSentry)
+	{
+		super(TSInitResult);
+		this.labelSentry = sentry;
+	}
 
 	parse_merlin_number(num_str:string) : number
 	{
@@ -86,22 +94,66 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 					this.hover.push(new vscode.MarkdownString('positive ASCII dstring'));
 				return lxbase.WalkerOptions.exit;
 			}
+			if (curs.nodeType=='label_ref' && curs.currentNode().firstChild?.type=='global_label')
+			{
+				let nodes = this.labelSentry.labels.globals.get(curs.nodeText);
+				if (!nodes)
+					nodes = this.labelSentry.labels.macros.get(curs.nodeText);
+				if (!nodes)
+					return lxbase.WalkerOptions.exit;
+				for (const node of nodes)
+				{
+					if (node.isDef)
+					{
+						const row = node.rng.start.line
+						let str = 'definition on line ' + (row+1);
+						if (this.currDoc && node.doc==null)
+							str += '\n```\n' + this.currDoc.lineAt(row).text + '\n```';
+						if (node.doc!=null)
+						{
+							str += '\n\nof ' + vscode.workspace.asRelativePath(node.doc.uri);
+							str += '\n```\n' + node.doc.lineAt(row).text + '\n```';
+						}
+						this.hover.push(new vscode.MarkdownString(str));
+					}
+				}
+			}
+			if (curs.nodeType=='label_def' && curs.currentNode().firstChild?.type=='global_label')
+			{
+				let entries = this.labelSentry.entries.get(curs.nodeText);
+				if (!entries)
+				{
+					this.hover.push(new vscode.MarkdownString('defined right here'));
+					return lxbase.WalkerOptions.exit;
+				}
+				for (const node of entries)
+				{
+					const row = node.rng.start.line
+					if (node.doc)
+						this.hover.push(new vscode.MarkdownString('entry found in file\n\n').
+							appendText(vscode.workspace.asRelativePath(node.doc.uri)).
+							appendText('\n\non line '+(row+1)).
+							appendCodeblock(node.doc.lineAt(row).text));
+				}
+			}
 			return lxbase.WalkerOptions.gotoChild;
 		}
 		return lxbase.WalkerOptions.gotoChild;
 	}
 	provideHover(document:vscode.TextDocument,position: vscode.Position,token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover>
 	{
+		this.currDoc = document;
 		this.hover = new Array<vscode.MarkdownString>();
 		this.position = position;
-		this.GetLabels(document);
+		this.GetProperties(document);
 		for (this.row=0;this.row<document.lineCount;this.row++)
 		{
-			const tree = this.parse(this.AdjustLine(document),"\n");
+			const tree = this.parse(this.AdjustLine(document,this.labelSentry.labels.macros),"\n");
 			this.walk(tree,this.get_hover.bind(this));
 			if (this.hover.length>0)
 				return new vscode.Hover(this.hover,this.range);
 		}
+		this.currDoc = null;
 		return undefined;
 	}
 }

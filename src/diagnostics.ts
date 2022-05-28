@@ -3,6 +3,8 @@ import Parser from 'web-tree-sitter';
 import * as lxbase from './langExtBase';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
+import * as path from 'path';
+import * as labels from './labels';
 
 class ProcessorModeSentry
 {
@@ -65,7 +67,7 @@ class ProcessorModeSentry
 		if (this.xcCount==2) // all modes are valid so exit now
 			return;
 		const req = this.xcCount==0 ? '6502' : '65c02';
-		if (curr.type=='global_label' && curs.currentFieldName()=='mac')
+		if (curr.type=='label_ref' && curs.currentFieldName()=='mac')
 		{
 			const opInfo= this.ops[curr.text.toLowerCase()]?.processors;
 			if (opInfo && !opInfo.includes(req))
@@ -105,6 +107,10 @@ class PseudoOpSentry
 {
 	psops = Object(pseudo);
 	merlinVersion = 'v8';
+	defFound = false;
+	orgFound = false;
+	relFound = false;
+	opFound = false;
 	constructor(merlinVersion: string)
 	{
 		this.merlinVersion = merlinVersion;
@@ -114,7 +120,31 @@ class PseudoOpSentry
 		const curr = curs.currentNode();
 		const prev = curr.previousSibling;
 
-		if (curr.type=='global_label' && curs.currentFieldName()=='mac')
+		if (curr.type=="label_def")
+			this.defFound = true;
+		if (curr.type=="operation")
+			this.opFound = true;
+		if (curr.type=="psop_org")
+			this.orgFound = true;
+		if (curr.type=="psop_rel")
+			this.relFound = true;
+		if (curr.type=="psop_obj" && this.opFound)
+			diag.push(new vscode.Diagnostic(rng,'OBJ should not appear after start of code'));
+		if (curr.type=="psop_rel" && this.orgFound || curr.type=="psop_org" && this.relFound)
+			diag.push(new vscode.Diagnostic(rng,'REL and ORG should not appear in the same file'));
+		if (curr.type=="psop_rel" && this.defFound)
+			diag.push(new vscode.Diagnostic(rng,'REL appears after one or more label definitions'));
+		if (curr.type=="psop_ext" || curr.type=="psop_exd" || curr.type=="psop_ent")
+		{
+			const operand = curr.nextNamedSibling && curr.nextNamedSibling.type!="comment";
+			if (prev && operand)
+				diag.push(new vscode.Diagnostic(rng,'use either column 1 or 3 for the label(s), not both',vscode.DiagnosticSeverity.Error));
+			if (!prev && !operand)
+				diag.push(new vscode.Diagnostic(rng,'must provide label(s) in either column 1 or 3',vscode.DiagnosticSeverity.Error));
+		}
+		if (curr.type=="psop_equ" && !prev)
+			diag.push(new vscode.Diagnostic(rng,'must provide label',vscode.DiagnosticSeverity.Error));
+		if (curr.type=='label_ref' && curs.currentFieldName()=='mac')
 		{
 			const psopInfo = this.psops[curr.text.toLowerCase()]?.version;
 			if (psopInfo && !psopInfo.includes(this.merlinVersion))
@@ -154,173 +184,19 @@ class PseudoOpSentry
 	}
 }
 
-// Check for label errors:
-// * local labels in macros, MAC, ENT, EXT, EQU, or first
-// * illegal forward references
-// * redefinition of global labels or local labels in the same scope
-// * macro names are reserved, and cannot be forward referenced
-
-class LabelSentry
-{
-	labels : lxbase.LabelSet;
-	currScope = '';
-	inMacro = false;
-	useFiles = 0;
-	putFiles = 0;
-	opExactPattern : RegExp;
-	psopExactPattern : RegExp;
-
-	constructor(opPat: RegExp,psopPat: RegExp)
-	{
-		this.labels = new lxbase.LabelSet();
-		this.opExactPattern = opPat;
-		this.psopExactPattern = psopPat;
-	}
-	/// Reset is to be called between first (gather) and second (verify) passes
-	reset()
-	{
-		this.currScope = '';
-		this.inMacro = false;
-		this.useFiles = 0;
-		this.putFiles = 0;
-	}
-	/// Gather all labels while checking for redefinitions.
-	visit_gather(diag: Array<vscode.Diagnostic>,curs: Parser.TreeCursor,rng: vscode.Range)
-	{
-		const curr = curs.currentNode();
-		const child = curr.firstNamedChild;
-		if (child && curr.type=='label_def')
-		{
-			if (child.type=='global_label')
-			{
-				if (curs.currentFieldName()=='mac')
-				{
-					if (child.text.match(this.opExactPattern) || child.text.match(this.psopExactPattern))
-						diag.push(new vscode.Diagnostic(rng,'macro name matches a mnemonic',vscode.DiagnosticSeverity.Warning));
-					if (this.labels.macros.has(child.text))
-						diag.push(new vscode.Diagnostic(rng,'redefinition of a macro',vscode.DiagnosticSeverity.Error));
-					if (this.labels.globals.has(child.text))
-						diag.push(new vscode.Diagnostic(rng,'macro name is used previously as a label',vscode.DiagnosticSeverity.Error));
-					this.labels.macros.add(child.text);
-				}
-				else
-				{
-					if (this.labels.globals.has(child.text))
-						diag.push(new vscode.Diagnostic(rng,'redefinition of a global label',vscode.DiagnosticSeverity.Error));
-					if (this.labels.macros.has(child.text))
-						diag.push(new vscode.Diagnostic(rng,'label name is used previously as a macro'))
-					this.labels.globals.add(child.text);
-					this.currScope = child.text;
-				}
-			}
-			else if (child.type=='local_label')
-			{
-				if (this.labels.locals.has(this.currScope+'\u0100'+child.text))
-					diag.push(new vscode.Diagnostic(rng,'redefinition of a local label',vscode.DiagnosticSeverity.Error));
-				this.labels.locals.add(this.currScope+'\u0100'+child.text);
-			}
-			else if (child.type=='var_label')
-			{
-				this.labels.vars.add(child.text);
-			}
-		}
-	}
-	visit_verify(diag: Array<vscode.Diagnostic>,curs: Parser.TreeCursor,rng: vscode.Range)
-	{
-		const curr = curs.currentNode();
-		const parent = curr.parent;
-		const is_var = (curr.type=='var_label') && (![...'123456789'].includes(curr.text[1]) || curr.text.length>2);
-		const localLabelExt = this.currScope + '\u0100' + curr.text;
-		if (curr.type=='psop_use')
-			this.useFiles += 1;
-		else if (curr.type=='psop_put')
-			this.putFiles += 1;
-		else if (curr.type=='label_def' && curs.currentFieldName()=='mac')
-		{
-			this.labels.runningMacros.add(curr.text);
-			this.inMacro = true;
-		}
-		else if (curr.type=='psop_eom')
-		{
-			if (this.inMacro==false)
-			{
-				diag.push(new vscode.Diagnostic(rng,'unmatched end of macro (EOM terminates all preceding MAC pseudo-ops)',vscode.DiagnosticSeverity.Error));
-				return;
-			}
-			this.inMacro = false;
-		}
-		else if (curr.type=='global_label' && curs.currentFieldName()=='mac')
-		{
-			const count = diag.length;
-			if (!this.labels.macros.has(curr.text) && this.labels.globals.has(curr.text))
-				diag.push(new vscode.Diagnostic(rng,'expected macro, this is a label',vscode.DiagnosticSeverity.Error));
-			else if (!this.labels.macros.has(curr.text) && this.useFiles>0)
-				diag.push(new vscode.Diagnostic(rng,'macro might be undefined',vscode.DiagnosticSeverity.Warning));
-			else if (!this.labels.macros.has(curr.text) && this.useFiles==0)
-				diag.push(new vscode.Diagnostic(rng,'macro is undefined',vscode.DiagnosticSeverity.Error));
-			else if (!this.labels.runningMacros.has(curr.text) && this.useFiles>0)
-				diag.push(new vscode.Diagnostic(rng,'macro might be forward referenced',vscode.DiagnosticSeverity.Warning));
-			else if (!this.labels.runningMacros.has(curr.text) && this.useFiles==0)
-				diag.push(new vscode.Diagnostic(rng,'macro is forward referenced',vscode.DiagnosticSeverity.Error));
-			if (count<diag.length)
-				return;
-		}
-		else if (parent && parent.type!='label_def' && curs.currentFieldName()!='mac')
-		{
-			const count = diag.length;
-			if (curr.type=='global_label' && this.labels.macros.has(curr.text))
-				diag.push(new vscode.Diagnostic(rng,'macro cannot be used here',vscode.DiagnosticSeverity.Error));
-			else if (curr.type=='global_label' && !this.labels.globals.has(curr.text) && this.useFiles+this.putFiles>0)
-				diag.push(new vscode.Diagnostic(rng,'global label might be undefined',vscode.DiagnosticSeverity.Warning));
-			else if (curr.type=='global_label' && !this.labels.globals.has(curr.text) && this.useFiles+this.putFiles==0)
-				diag.push(new vscode.Diagnostic(rng,'global label is undefined',vscode.DiagnosticSeverity.Error));
-			else if (curr.type=='local_label' && !this.labels.locals.has(localLabelExt))
-				diag.push(new vscode.Diagnostic(rng,'local label is not defined in this scope',vscode.DiagnosticSeverity.Error));
-			else if (is_var && !this.labels.vars.has(curr.text) && this.useFiles+this.putFiles>0)
-				diag.push(new vscode.Diagnostic(rng,'variable might be undefined',vscode.DiagnosticSeverity.Warning));
-			else if (is_var && !this.labels.vars.has(curr.text) && this.useFiles+this.putFiles==0)
-				diag.push(new vscode.Diagnostic(rng,'variable is undefined',vscode.DiagnosticSeverity.Error));
-			else if (is_var && !this.labels.runningVars.has(curr.text) && this.useFiles+this.putFiles>0)
-				diag.push(new vscode.Diagnostic(rng,'variable might be forward referenced',vscode.DiagnosticSeverity.Warning));
-			else if (is_var && !this.labels.runningVars.has(curr.text) && this.useFiles+this.putFiles==0)
-				diag.push(new vscode.Diagnostic(rng,'variable is forward referenced',vscode.DiagnosticSeverity.Warning));
-			if (count<diag.length)
-				return;
-		}
-		else if (parent && parent.type=='label_def')
-		{
-			if (curr.type=='global_label')
-				this.currScope = curr.text;
-			else if (curr.type=='local_label')
-			{
-				if (this.currScope=='')
-					diag.push(new vscode.Diagnostic(rng,'no global scope defined yet',vscode.DiagnosticSeverity.Error));
-				const next = parent.nextNamedSibling;
-				if (next && (next.type=='psop_mac' || next.type=='psop_ent' || next.type=='psop_ext' || next.type=='psop_equ'))
-					diag.push(new vscode.Diagnostic(rng,'cannot use local label for ' + next.text,vscode.DiagnosticSeverity.Error));
-				if (this.inMacro)
-					diag.push(new vscode.Diagnostic(rng,'cannot use local labels in a macro',vscode.DiagnosticSeverity.Error));
-			}
-			else if (curr.type=='var_label')
-				this.labels.runningVars.add(curr.text);
-		}
-	}
-}
-
 // Apparently no standard provider, so make one up
 export class TSDiagnosticProvider extends lxbase.LangExtBase
 {
 	procSentry : ProcessorModeSentry;
 	psopSentry : PseudoOpSentry;
-	labelSentry : LabelSentry;
-	diag : Array<vscode.Diagnostic>;
-	constructor(TSInitResult : [Parser,Parser.Language])
+	labelSentry : labels.LabelSentry;
+	diag = Array<vscode.Diagnostic>();
+	constructor(TSInitResult : [Parser,Parser.Language],sentry: labels.LabelSentry)
 	{
 		super(TSInitResult);
 		this.procSentry = new ProcessorModeSentry(this.merlinVersion);
 		this.psopSentry = new PseudoOpSentry(this.merlinVersion);
-		this.labelSentry = new LabelSentry(this.opExactPattern,this.psopExactPattern);
-		this.diag = new Array<vscode.Diagnostic>();
+		this.labelSentry = sentry;
 	}
 	value_range(diag: Array<vscode.Diagnostic>,node: Parser.SyntaxNode,low:number,high:number)
 	{
@@ -346,18 +222,12 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 		}
 		return false;
 	}
-	visit_gather(curs: Parser.TreeCursor): lxbase.WalkerChoice
-	{
-		const rng = this.curs_to_range(curs,this.row,this.col);
-		this.labelSentry.visit_gather(this.diag,curs,rng);
-		return lxbase.WalkerOptions.gotoChild;
-	}
 	visit_verify(curs: Parser.TreeCursor): lxbase.WalkerChoice
 	{
 		const maxLabLen = this.merlinVersion=='v8' ? 13 : 26;
+		const maxc3c4Len = this.merlinVersion=='v8' ? 64 : 80;
 		const dstring_psops = ['psop_asc','psop_dci','psop_inv','psop_fls','psop_rev','psop_str','psop_strl']
 		const rng = this.curs_to_range(curs,this.row,this.col);
-		this.labelSentry.visit_verify(this.diag,curs,rng);
 		this.procSentry.visit(this.diag,curs,rng);
 		this.psopSentry.visit(this.diag,curs,rng);
 		if (curs.currentNode().hasError())
@@ -370,8 +240,6 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 			const child = curs.currentNode().firstChild;
 			if (child && child.type=="dos33")
 				this.diag.push(new vscode.Diagnostic(rng,'name is valid for DOS 3.3, but not ProDOS',vscode.DiagnosticSeverity.Warning));
-			if (child && child.type=="anyfs")
-				this.diag.push(new vscode.Diagnostic(rng,'incorrect syntax',vscode.DiagnosticSeverity.Error));
 		}
 		if (this.caseSens && (curs.currentNode().type.substring(0,3)=='op_' || curs.currentNode().type.substring(0,5)=='psop_'))
 		{
@@ -420,39 +288,16 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 			if (curs.currentNode().text.length > maxLabLen && this.merlinVersion!='v32')
 				this.diag.push(new vscode.Diagnostic(rng,"label is too long (max = "+maxLabLen+")",vscode.DiagnosticSeverity.Error));
 		}
+		if (curs.currentFieldName()=='c3' && curs.nodeText.length > maxc3c4Len && this.merlinVersion!='v32')
+		{
+			this.diag.push(new vscode.Diagnostic(rng,'column 3 is too long (max = '+maxc3c4Len+')',vscode.DiagnosticSeverity.Error))
+		}
 		if (curs.currentNode().type=="comment" && this.merlinVersion!='v32')
 		{
-			// there is a limit on the length of the third and fourth columns.
-			// if the parser provided column nodes this would be easier.
-			// n.b. there are some issues with using regex for this.
-			const curr = curs.currentNode();
-			const parent = curr.parent;
-			let c3 = ""; // our problem is to find this
-			if (parent)
-			{
-				let c2_search = "";
-				if (parent.type.substring(0,5)=="macro")
-					c2_search = "global_label";
-				else if (parent.type=="operation")
-					c2_search = "op_";
-				else if (parent.type=="pseudo_operation")
-					c2_search = "psop_";
-				if (c2_search.length>0)
-				{
-					let sib = parent.firstChild;
-					while (sib && sib.type.search(c2_search)==-1)
-						sib = sib.nextSibling; // will exit with the instruction
-					if (sib)
-						sib = sib.nextSibling; // move past instruction
-					while (sib && sib.type!='comment')
-					{
-						c3 += sib.text
-						sib = sib.nextSibling;
-					}
-				}
-			}
-			if (c3.length + curr.text.length > 64)
-				this.diag.push(new vscode.Diagnostic(rng,'columns 3 and 4 together are too long (max = 64)',vscode.DiagnosticSeverity.Error))
+			// there is a limit on the combined length of the third and fourth columns.
+			const c3 = curs.currentNode().parent?.childForFieldName('c3');
+			if (c3 && c3.text.length + curs.currentNode().text.length > maxc3c4Len)
+				this.diag.push(new vscode.Diagnostic(rng,'columns 3 and 4 together are too long (max = '+maxc3c4Len+')',vscode.DiagnosticSeverity.Error))
 		}
 		if (curs.currentNode().type=="main_comment" && curs.nodeText.length > 64 && this.merlinVersion!='v32')
 			this.diag.push(new vscode.Diagnostic(rng,'comment is too long (max = 64)',vscode.DiagnosticSeverity.Error))
@@ -464,24 +309,19 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 		{
 			collection.clear();
 			this.reset();
-			this.diag.length = 0;
-			this.GetLabels(document); // must precede new LabelSentry
+			this.GetProperties(document);
 			if (this.get_interpretation(document)=='linker')
 				return;
-			this.labelSentry = new LabelSentry(this.opExactPattern,this.psopExactPattern);
+			// the labelSentry carries out its own passes through the tree
+			this.labelSentry.build_main(document);
+			this.labelSentry.verify_main(document);
+			this.diag = this.labelSentry.diag;
+			// other sentries merely provide visit functions for the final pass
 			this.psopSentry = new PseudoOpSentry(this.merlinVersion);
 			this.procSentry = new ProcessorModeSentry(this.merlinVersion);
-			// first pass gathers labels again, redundancy could perhaps be eliminated
 			for (this.row=0;this.row<document.lineCount;this.row++)
 			{
-				const tree = this.parse(this.AdjustLine(document),"\n");
-				this.walk(tree,this.visit_gather.bind(this));
-			}
-			// second pass builds diagnostics
-			this.labelSentry.reset();
-			for (this.row=0;this.row<document.lineCount;this.row++)
-			{
-				const tree = this.parse(this.AdjustLine(document),"\n");
+				const tree = this.parse(this.AdjustLine(document,this.labelSentry.labels.macros),"\n");
 				this.walk(tree,this.visit_verify.bind(this));
 			}
 			collection.set(document.uri, this.diag);

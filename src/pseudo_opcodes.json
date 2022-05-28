@@ -23,7 +23,7 @@
     },
     "adr": {
         "alt": [],
-        "args": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "args": "seq($._aexpr,repeat(seq(',',$._aexpr)))",
         "brief": "define long address",
         "category": "data storage",
         "caveat": null,
@@ -47,7 +47,7 @@
     },
     "adrl": {
         "alt": [],
-        "args": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "args": "seq($._aexpr,repeat(seq(',',$._aexpr)))",
         "brief": "define long address",
         "category": "data storage",
         "caveat": null,
@@ -195,7 +195,7 @@
         "alt": [
             "dw"
         ],
-        "args": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "args": "seq($._aexpr,repeat(seq(',',$._aexpr)))",
         "brief": "define address or word",
         "category": "data storage",
         "caveat": null,
@@ -269,7 +269,7 @@
     },
     "ddb": {
         "alt": [],
-        "args": "$._aexpr,repeat(seq(',',$._aexpr))",
+        "args": "seq($._aexpr,repeat(seq(',',$._aexpr)))",
         "brief": "define double byte",
         "category": "data storage",
         "caveat": null,
@@ -317,7 +317,7 @@
         "alt": [
             "db"
         ],
-        "args": "$._data_aexpr,repeat(seq(',',$._data_aexpr))",
+        "args": "seq($._data_aexpr,repeat(seq(',',$._data_aexpr)))",
         "brief": "define byte",
         "category": "data storage",
         "caveat": null,
@@ -480,11 +480,11 @@
     },
     "ent": {
         "alt": [],
-        "args": "optional(seq($._label,repeat(seq(',',$._label))))",
+        "args": "optional(seq($.label_ref,repeat(seq(',',$.label_ref))))",
         "brief": "entry label",
         "category": "assembler",
         "caveat": null,
-        "desc": "defines label as referenceable to an external label by another REL module",
+        "desc": "defines label as entry for use by the linker, i.e., export the label to another REL module",
         "eg": [
             "lab  ENT",
             "     ENT  lab1,lab2"
@@ -575,11 +575,11 @@
     },
     "exd": {
         "alt": [],
-        "args": "optional(seq($._label,repeat(seq(',',$._label))))",
+        "args": "optional(seq($.label_def,repeat(seq(',',$.label_def))))",
         "brief": "external label direct page",
         "category": "assembler",
         "caveat": null,
-        "desc": "defines label as a direct page external for use by linker",
+        "desc": "defines label as a direct page external for use by linker, i.e., import the label from another REL module",
         "eg": [
             "lab  EXD",
             "     EXD  lab1,lab2"
@@ -622,11 +622,11 @@
     },
     "ext": {
         "alt": [],
-        "args": "optional(seq($._label,repeat(seq(',',$._label))))",
+        "args": "optional(seq($.label_def,repeat(seq(',',$.label_def))))",
         "brief": "external label",
         "category": "assembler",
         "caveat": null,
-        "desc": "defines label as external for use by linker",
+        "desc": "defines label as external for use by linker, i.e., import the label from another REL module",
         "eg": [
             "lab  EXT",
             "     EXT  lab1,lab2"
@@ -864,7 +864,7 @@
         "args": "$._aexpr",
         "brief": "begin loop",
         "category": "miscellaneous",
-        "caveat": "ampersand is used to form iterated labels",
+        "caveat": "at-symbol is used to form iterated labels",
         "desc": "begin loop",
         "eg": [
             "     LUP  NUM   ; start",
@@ -1018,7 +1018,7 @@
         "alt": [
             ">>>"
         ],
-        "args": "field('mac',$.global_label),optional(seq($._arg_sep,$.macro_args))",
+        "args": "seq(field('mac',$.label_ref),optional(seq($._arg_sep,$.macro_args)))",
         "brief": "put macro call",
         "category": "macro",
         "caveat": "macro label can also go directly in the instruction column",
@@ -1324,7 +1324,7 @@
     },
     "var": {
         "alt": [],
-        "args": "$._aexpr,repeat(seq(';',$._aexpr))",
+        "args": "seq($._aexpr,repeat(seq(';',$._aexpr)))",
         "brief": "setup variables",
         "category": "assembler",
         "caveat": "often used just prior to PUT",
