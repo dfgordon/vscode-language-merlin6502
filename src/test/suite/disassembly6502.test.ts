@@ -217,18 +217,33 @@ describe('6502 Disassembly: branching', async function() {
 		const labelSentry = new labels.LabelSentry(TSInitResult);
 		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
 	});
-	it('branch on status', async function() {
-        const hexInput = '9000b000f0003000d000100050007000';
+	it('forward branch', async function() {
+        const hexInput = '907fb010f0003000d000100050007000';
         const binaryInput = Buffer.from(hexInput,"hex");
         const expectedCode =
-            '\tBCC\t$0002\n' +
-            '\tBCS\t$0004\n' +
+            '\tBCC\t$0081\n' +
+            '\tBCS\t$0014\n' +
             '\tBEQ\t$0006\n' +
             '\tBMI\t$0008\n' +
             '\tBNE\t$000A\n' +
             '\tBPL\t$000C\n' +
             '\tBVC\t$000E\n' +
             '\tBVS\t$0010\n';
+        const actualCode = this.disTool.disassemble(binaryInput,[0,hexInput.length/2],0,'none');
+        assert.strictEqual(actualCode,expectedCode);
+	});
+	it('reverse branch', async function() {
+        const hexInput = '9000b0fcf0fc30fcd0fc10fc50fc70fc';
+        const binaryInput = Buffer.from(hexInput,"hex");
+        const expectedCode =
+            '\tBCC\t$0002\n' +
+            '\tBCS\t$0000\n' +
+            '\tBEQ\t$0002\n' +
+            '\tBMI\t$0004\n' +
+            '\tBNE\t$0006\n' +
+            '\tBPL\t$0008\n' +
+            '\tBVC\t$000A\n' +
+            '\tBVS\t$000C\n';
         const actualCode = this.disTool.disassemble(binaryInput,[0,hexInput.length/2],0,'none');
         assert.strictEqual(actualCode,expectedCode);
 	});

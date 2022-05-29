@@ -221,7 +221,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 						for (let i=0;i<bytes;i++)
 							val += img[addr+i]*(256**i);
 						if (op.relative)
-							val += addr + bytes;
+							val = addr + bytes + (val<128 ? val : val-256);
 						if (!op.immediate)
 							references.add(val);
 						if (op.relative)
