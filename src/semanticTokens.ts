@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import Parser from 'web-tree-sitter';
-import { LabelSentry } from './labels';
+import { sharedLabels } from './extension';
 import * as lxbase from './langExtBase';
 
 const tokenTypes = [
@@ -15,15 +15,10 @@ const tokenModifiers = [
 
 export const legend = new vscode.SemanticTokensLegend(tokenTypes,tokenModifiers);
 
-export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vscode.DocumentSemanticTokensProvider
+class SemanticTokensBase extends lxbase.LangExtBase
 {
-	labelSentry : LabelSentry;
 	tokensBuilder : vscode.SemanticTokensBuilder = new vscode.SemanticTokensBuilder(legend);
-	constructor(TSInitResult : [Parser,Parser.Language], sentry: LabelSentry)
-	{
-		super(TSInitResult);
-		this.labelSentry = sentry;
-	}
+
 	process_node(curs: Parser.TreeCursor): lxbase.WalkerChoice
 	{
 		const rng = this.curs_to_range(curs,this.row,this.col);
@@ -75,7 +70,7 @@ export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vsco
 		if (curs.nodeType.slice(0,5)=="psop_")
 		{
 			this.tokensBuilder.push(rng,"function",[]);
-			return lxbase.WalkerOptions.gotoChild;
+			return lxbase.WalkerOptions.gotoSibling;
 		}
 		if (["dstring","pchar","nchar","literal_arg","literal","filename","trailing"].indexOf(curs.nodeType)>-1)
 		{
@@ -89,6 +84,27 @@ export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vsco
 		}
 		return lxbase.WalkerOptions.gotoChild;
 	}
+}
+
+export class RangeTokensProvider extends SemanticTokensBase implements vscode.DocumentRangeSemanticTokensProvider
+{
+	provideDocumentRangeSemanticTokens(document:vscode.TextDocument,range: vscode.Range): vscode.ProviderResult<vscode.SemanticTokens>
+	{
+		this.tokensBuilder = new vscode.SemanticTokensBuilder(legend);
+		this.GetProperties(document);
+		if (this.get_interpretation(document)=='linker')
+			return null;
+		for (this.row=range.start.line;this.row<range.end.line;this.row++)
+		{
+			const tree = this.parse(this.AdjustLine(document,sharedLabels.macros),"\n");
+			this.walk(tree,this.process_node.bind(this));
+		}
+		return this.tokensBuilder.build();
+	}
+}
+
+export class DocTokensProvider extends SemanticTokensBase implements vscode.DocumentSemanticTokensProvider
+{
 	provideDocumentSemanticTokens(document:vscode.TextDocument): vscode.ProviderResult<vscode.SemanticTokens>
 	{
 		this.tokensBuilder = new vscode.SemanticTokensBuilder(legend);
@@ -97,7 +113,7 @@ export class TSSemanticTokensProvider extends lxbase.LangExtBase implements vsco
 			return null;
 		for (this.row=0;this.row<document.lineCount;this.row++)
 		{
-			const tree = this.parse(this.AdjustLine(document,this.labelSentry.labels.macros),"\n");
+			const tree = this.parse(this.AdjustLine(document,sharedLabels.macros),"\n");
 			this.walk(tree,this.process_node.bind(this));
 		}
 		return this.tokensBuilder.build();

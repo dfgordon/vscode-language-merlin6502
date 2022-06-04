@@ -7,7 +7,7 @@ import * as path from 'path';
 import { platform } from 'os';
 import * as opcodes from './opcodes.json';
 import * as Parser from 'web-tree-sitter';
-import { LabelSentry } from './labels';
+import { sharedLabels } from './extension';
 
 type OpData =
 {
@@ -48,11 +48,9 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 	formattedCode = "";
 	callToken = '\u0100';
 	persistentSpace = '\u0100';
-	labelSentry : LabelSentry;
-	constructor(TSInitResult : [Parser,Parser.Language], sentry: LabelSentry)
+	constructor(TSInitResult : [Parser,Parser.Language])
 	{
 		super(TSInitResult);
-		this.labelSentry = sentry;
 		// This map creates a string where we can simply search for a number,
 		// and the number is the length of the binary data.  Furthermore,
 		// the value of the data replaces the number.
@@ -181,7 +179,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		let code = '';
 		for (let i=startAddr;i<endAddr;i++)
 		{
-			let charCode = img[i];
+			const charCode = img[i];
 			if (charCode<128)
 				code += String.fromCharCode(charCode);
 			else if (String.fromCharCode(charCode-128)==' ')
@@ -194,6 +192,8 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 	}
 	disassemble(img: Buffer, rng: [number,number], xc: number, lbl: string) : string
 	{
+		const conf = vscode.workspace.getConfiguration('merlin6502');
+		const accept_brk : boolean | undefined = conf.get('disassembly.brk');
 		let addr = rng[0];
 		let code = '';
 		const addresses = new Array<number>();
@@ -206,7 +206,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		{
 			addresses.push(addr);
 			const op = this.disassemblyMap.get(img[addr]);
-			if (op && xc>=op.xc)
+			if (op && xc>=op.xc && (img[addr]!=0 || accept_brk))
 			{
 				instructions.push(op.mnemonic.toUpperCase());
 				addr += 1;
@@ -394,7 +394,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		this.formattedCode = '';
 		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
 		{
-			this.formattedLine = this.AdjustLine(verified.doc,this.labelSentry.labels.macros);
+			this.formattedLine = this.AdjustLine(verified.doc,sharedLabels.macros);
 			const tree = this.parse(this.formattedLine,"\n");
 			this.walk(tree,this.format_node.bind(this));
 			this.formattedCode += this.formattedLine.
@@ -415,6 +415,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		const proceed = await proceedDespiteErrors(verified.doc,'Formatting');
 		if (!proceed)
 			return;
+		this.config = vscode.workspace.getConfiguration('merlin6502');
 		const widths = [
 			this.config.get('columns.c1') as number,
 			this.config.get('columns.c2') as number,
@@ -430,7 +431,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		{
 			if (sel.isEmpty || (this.row>=sel.start.line && this.row<sel.end.line))
 			{
-				this.formattedLine = this.AdjustLine(verified.doc,this.labelSentry.labels.macros);
+				this.formattedLine = this.AdjustLine(verified.doc,sharedLabels.macros);
 				const tree = this.parse(this.formattedLine,"\n");
 				this.walk(tree,this.format_node.bind(this));
 				this.formattedLine = this.formattedLine.replace(RegExp('^'+this.callToken),'').replace(/\s+/g,' ');

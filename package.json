@@ -97,6 +97,11 @@
 					"type": "boolean",
 					"default": true,
 					"markdownDescription": "Show hovers for pseudo-opcode mnemonics such as `EQU`, `ASC`, etc."
+				},
+				"merlin6502.disassembly.brk": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Recognize BRK instruction and operand during disassembly"
 				}
 			}
 		},

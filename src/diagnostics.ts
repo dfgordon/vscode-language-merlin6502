@@ -3,7 +3,6 @@ import Parser from 'web-tree-sitter';
 import * as lxbase from './langExtBase';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
-import * as path from 'path';
 import * as labels from './labels';
 
 class ProcessorModeSentry
@@ -187,16 +186,22 @@ class PseudoOpSentry
 // Apparently no standard provider, so make one up
 export class TSDiagnosticProvider extends lxbase.LangExtBase
 {
+	lastUpdate : number;
+	lastTimeToSolution : number;
 	procSentry : ProcessorModeSentry;
 	psopSentry : PseudoOpSentry;
 	labelSentry : labels.LabelSentry;
 	diag = Array<vscode.Diagnostic>();
+	busy : boolean;
 	constructor(TSInitResult : [Parser,Parser.Language],sentry: labels.LabelSentry)
 	{
 		super(TSInitResult);
 		this.procSentry = new ProcessorModeSentry(this.merlinVersion);
 		this.psopSentry = new PseudoOpSentry(this.merlinVersion);
 		this.labelSentry = sentry;
+		this.busy = false;
+		this.lastUpdate = 0;
+		this.lastTimeToSolution = 1000;
 	}
 	value_range(diag: Array<vscode.Diagnostic>,node: Parser.SyntaxNode,low:number,high:number)
 	{
@@ -233,26 +238,61 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 		if (curs.currentNode().hasError())
 		{
 			if (!this.is_error_inside(curs.currentNode()))
-				this.diag.push(new vscode.Diagnostic(rng,curs.currentNode().toString(),vscode.DiagnosticSeverity.Error));
+				this.diag.push(new vscode.Diagnostic(rng,'syntax error:\n'+curs.currentNode().toString(),vscode.DiagnosticSeverity.Error));
 		}
-		if (curs.currentNode().type=="filename")
+		else if (["global_label","local_label","var_label"].includes(curs.currentNode().type))
+		{
+			if (curs.currentNode().text.length > maxLabLen && this.merlinVersion!='v32')
+				this.diag.push(new vscode.Diagnostic(rng,"label is too long (max = "+maxLabLen+")",vscode.DiagnosticSeverity.Error));
+		}
+		else if (this.caseSens && (curs.currentNode().type.substring(0,3)=='op_' || curs.currentNode().type.substring(0,5)=='psop_'))
+		{
+			if (curs.nodeText != curs.nodeText.toUpperCase())
+				this.diag.push(new vscode.Diagnostic(rng,'settings require uppercase mnemonics',vscode.DiagnosticSeverity.Error));
+		}
+		else if (curs.currentNode().type=='num_str_prefix' && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
+			this.diag.push(new vscode.Diagnostic(rng,'numerical string prefix requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
+		else if (curs.currentNode().type=='braced_aexpr' && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
+			this.diag.push(new vscode.Diagnostic(rng,'braced expressions require Merlin 16+/32',vscode.DiagnosticSeverity.Error));
+		else if (curs.currentNode().type.substring(0,4)=="cop_" && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
+			this.diag.push(new vscode.Diagnostic(rng,'operator requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
+		else if (curs.currentNode().type=="dstring" && this.merlinVersion=='v32')
+		{
+			const delim = curs.nodeText.charAt(0);
+			if (delim!='"' && delim!="'")
+				this.diag.push(new vscode.Diagnostic(rng,'Merlin 32 strings use either single or double quotes',vscode.DiagnosticSeverity.Error));
+		}
+		else if (curs.currentNode().type=="trailing" && this.merlinVersion=='v32')
+		{
+			if (curs.nodeText.toUpperCase()!='L')
+				this.diag.push(new vscode.Diagnostic(rng,'Merlin 32 may not accept trailing characters',vscode.DiagnosticSeverity.Warning));
+		}
+		else if (curs.currentNode().type=="comment" && this.merlinVersion!='v32')
+		{
+			// there is a limit on the combined length of the third and fourth columns.
+			const c3 = curs.currentNode().parent?.childForFieldName('c3');
+			if (c3 && c3.text.length + curs.currentNode().text.length > maxc3c4Len)
+				this.diag.push(new vscode.Diagnostic(rng,'columns 3 and 4 together are too long (max = '+maxc3c4Len+')',vscode.DiagnosticSeverity.Error))
+			return lxbase.WalkerOptions.gotoSibling;
+		}
+		else if (curs.currentNode().type=="main_comment" && curs.nodeText.length > 64 && this.merlinVersion!='v32')
+		{
+			this.diag.push(new vscode.Diagnostic(rng,'comment is too long (max = 64)',vscode.DiagnosticSeverity.Error))
+			return lxbase.WalkerOptions.exit;
+		}
+		else if (curs.currentNode().type=="filename")
 		{
 			const child = curs.currentNode().firstChild;
 			if (child && child.type=="dos33")
 				this.diag.push(new vscode.Diagnostic(rng,'name is valid for DOS 3.3, but not ProDOS',vscode.DiagnosticSeverity.Warning));
 		}
-		if (this.caseSens && (curs.currentNode().type.substring(0,3)=='op_' || curs.currentNode().type.substring(0,5)=='psop_'))
+	
+		// these may coincide with previous node types, so must be outside else if sequence
+		if (curs.currentFieldName()=='c3' && curs.nodeText.length > maxc3c4Len && this.merlinVersion!='v32')
 		{
-			if (curs.nodeText != curs.nodeText.toUpperCase())
-				this.diag.push(new vscode.Diagnostic(rng,'settings require uppercase mnemonics',vscode.DiagnosticSeverity.Error));
+			this.diag.push(new vscode.Diagnostic(rng,'column 3 is too long (max = '+maxc3c4Len+')',vscode.DiagnosticSeverity.Error))
 		}
-		if (curs.currentNode().type=='num_str_prefix' && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
-			this.diag.push(new vscode.Diagnostic(rng,'numerical string prefix requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
-		if (curs.currentNode().type=='braced_aexpr' && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
-			this.diag.push(new vscode.Diagnostic(rng,'braced expressions require Merlin 16+/32',vscode.DiagnosticSeverity.Error));
-		if (curs.currentNode().type.substring(0,4)=="cop_" && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
-			this.diag.push(new vscode.Diagnostic(rng,'operator requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
-		if (dstring_psops.includes(curs.currentNode().type) && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
+		else if (dstring_psops.includes(curs.currentNode().type) && (this.merlinVersion=='v8' || this.merlinVersion=='v16'))
 		{
 			let curr = curs.currentNode().nextNamedSibling;
 			let count = 0;
@@ -272,59 +312,49 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 			if (count>2 && newRng)
 				this.diag.push(new vscode.Diagnostic(newRng,'extended string operand requires Merlin 16+/32',vscode.DiagnosticSeverity.Error));
 		}
-		if (curs.currentNode().type=="dstring" && this.merlinVersion=='v32')
-		{
-			const delim = curs.nodeText.charAt(0);
-			if (delim!='"' && delim!="'")
-				this.diag.push(new vscode.Diagnostic(rng,'Merlin 32 strings use either single or double quotes',vscode.DiagnosticSeverity.Error));
-		}
-		if (curs.currentNode().type=="trailing" && this.merlinVersion=='v32')
-		{
-			if (curs.nodeText.toUpperCase()!='L')
-				this.diag.push(new vscode.Diagnostic(rng,'Merlin 32 may not accept trailing characters',vscode.DiagnosticSeverity.Warning));
-		}
-		if (["global_label","local_label","var_label"].includes(curs.currentNode().type))
-		{
-			if (curs.currentNode().text.length > maxLabLen && this.merlinVersion!='v32')
-				this.diag.push(new vscode.Diagnostic(rng,"label is too long (max = "+maxLabLen+")",vscode.DiagnosticSeverity.Error));
-		}
-		if (curs.currentFieldName()=='c3' && curs.nodeText.length > maxc3c4Len && this.merlinVersion!='v32')
-		{
-			this.diag.push(new vscode.Diagnostic(rng,'column 3 is too long (max = '+maxc3c4Len+')',vscode.DiagnosticSeverity.Error))
-		}
-		if (curs.currentNode().type=="comment" && this.merlinVersion!='v32')
-		{
-			// there is a limit on the combined length of the third and fourth columns.
-			const c3 = curs.currentNode().parent?.childForFieldName('c3');
-			if (c3 && c3.text.length + curs.currentNode().text.length > maxc3c4Len)
-				this.diag.push(new vscode.Diagnostic(rng,'columns 3 and 4 together are too long (max = '+maxc3c4Len+')',vscode.DiagnosticSeverity.Error))
-		}
-		if (curs.currentNode().type=="main_comment" && curs.nodeText.length > 64 && this.merlinVersion!='v32')
-			this.diag.push(new vscode.Diagnostic(rng,'comment is too long (max = 64)',vscode.DiagnosticSeverity.Error))
+
 		return lxbase.WalkerOptions.gotoChild;
 	}
-	update(document : vscode.TextDocument, collection: vscode.DiagnosticCollection): void
+	update(document : vscode.TextDocument,
+		collection: vscode.DiagnosticCollection,
+		versionIndicator: vscode.StatusBarItem,
+		typeIndicator: vscode.StatusBarItem,
+		force: boolean)
 	{
+		const startTime = new Date().getTime();
+		if (!force && (this.busy || startTime<this.lastUpdate + this.lastTimeToSolution))
+			return;				
 		if (document && document.languageId=='merlin6502')
 		{
-			collection.clear();
+			this.lastUpdate = startTime;
+			this.busy = true;
 			this.reset();
 			this.GetProperties(document);
-			if (this.get_interpretation(document)=='linker')
-				return;
-			// the labelSentry carries out its own passes through the tree
-			this.labelSentry.build_main(document);
-			this.labelSentry.verify_main(document);
-			this.diag = this.labelSentry.diag;
-			// other sentries merely provide visit functions for the final pass
-			this.psopSentry = new PseudoOpSentry(this.merlinVersion);
-			this.procSentry = new ProcessorModeSentry(this.merlinVersion);
-			for (this.row=0;this.row<document.lineCount;this.row++)
+			typeIndicator.text = this.get_interpretation(document);
+			if (typeIndicator.text=='source')
 			{
-				const tree = this.parse(this.AdjustLine(document,this.labelSentry.labels.macros),"\n");
-				this.walk(tree,this.visit_verify.bind(this));
+				// the labelSentry carries out its own passes through the tree
+				this.labelSentry.build_main(document);
+				this.labelSentry.verify_main(document);
+				this.diag = this.labelSentry.diag;
+				// other sentries merely provide visit functions for the final pass
+				this.psopSentry = new PseudoOpSentry(this.merlinVersion);
+				this.procSentry = new ProcessorModeSentry(this.merlinVersion);
+				for (this.row=0;this.row<document.lineCount;this.row++)
+				{
+					const tree = this.parse(this.AdjustLine(document,this.labelSentry.labels.macros),"\n");
+					this.walk(tree,this.visit_verify.bind(this));
+				}
+				collection.set(document.uri, this.diag);
 			}
-			collection.set(document.uri, this.diag);
+			else
+			{
+				this.labelSentry.labels = new labels.LabelSet();
+			}
+			versionIndicator.show();
+			typeIndicator.show();
+			this.lastTimeToSolution = 3*(new Date().getTime() - startTime);
+			this.busy = false;
 		}
 	}
 }

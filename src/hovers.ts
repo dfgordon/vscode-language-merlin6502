@@ -2,12 +2,11 @@ import * as vscode from 'vscode';
 import Parser from 'web-tree-sitter';
 import { AddressHovers } from './hoversAddresses';
 import { OpcodeHovers, PseudoOpcodeHovers } from './hoversStatements';
-import { LabelSentry } from './labels';
+import { sharedLabels } from './extension';
 import * as lxbase from './langExtBase';
 
 export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverProvider
 {
-	labelSentry : LabelSentry;
 	addresses = new AddressHovers();
 	opcodes = new OpcodeHovers();
 	pseudo = new PseudoOpcodeHovers();
@@ -15,11 +14,6 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 	position = new vscode.Position(0,0);
 	range = new vscode.Range(new vscode.Position(0,0),new vscode.Position(0,0));
 	currDoc : vscode.TextDocument | null = null;
-	constructor(TSInitResult : [Parser,Parser.Language], sentry: LabelSentry)
-	{
-		super(TSInitResult);
-		this.labelSentry = sentry;
-	}
 
 	parse_merlin_number(num_str:string) : number
 	{
@@ -96,9 +90,9 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 			}
 			if (curs.nodeType=='label_ref' && curs.currentNode().firstChild?.type=='global_label')
 			{
-				let nodes = this.labelSentry.labels.globals.get(curs.nodeText);
+				let nodes = sharedLabels.globals.get(curs.nodeText);
 				if (!nodes)
-					nodes = this.labelSentry.labels.macros.get(curs.nodeText);
+					nodes = sharedLabels.macros.get(curs.nodeText);
 				if (!nodes)
 					return lxbase.WalkerOptions.exit;
 				for (const node of nodes)
@@ -117,30 +111,38 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 						this.hover.push(new vscode.MarkdownString(str));
 					}
 				}
+				return lxbase.WalkerOptions.exit;
 			}
 			if (curs.nodeType=='label_def' && curs.currentNode().firstChild?.type=='global_label')
 			{
-				let entries = this.labelSentry.entries.get(curs.nodeText);
+				const next = curs.currentNode().nextNamedSibling;
+				const entries = sharedLabels.entries.get(curs.nodeText);
+				this.hover.push(new vscode.MarkdownString('defined right here'));
 				if (!entries)
-				{
-					this.hover.push(new vscode.MarkdownString('defined right here'));
 					return lxbase.WalkerOptions.exit;
-				}
+				if (next && next.type=='psop_ent')
+					return lxbase.WalkerOptions.exit;
 				for (const node of entries)
 				{
 					const row = node.rng.start.line
-					if (node.doc)
-						this.hover.push(new vscode.MarkdownString('entry found in file\n\n').
-							appendText(vscode.workspace.asRelativePath(node.doc.uri)).
-							appendText('\n\non line '+(row+1)).
-							appendCodeblock(node.doc.lineAt(row).text));
+					if (node.doc) {
+						if (node.doc == this.currDoc)
+							this.hover.push(new vscode.MarkdownString('entry found on line '+(row+1)).
+								appendCodeblock(node.doc.lineAt(row).text));
+						else
+							this.hover.push(new vscode.MarkdownString('entry found in file\n\n').
+								appendText(vscode.workspace.asRelativePath(node.doc.uri)).
+								appendText('\n\non line '+(row+1)).
+								appendCodeblock(node.doc.lineAt(row).text));
+					}
 				}
+				return lxbase.WalkerOptions.exit;
 			}
 			return lxbase.WalkerOptions.gotoChild;
 		}
 		return lxbase.WalkerOptions.gotoChild;
 	}
-	provideHover(document:vscode.TextDocument,position: vscode.Position,token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover>
+	provideHover(document:vscode.TextDocument,position: vscode.Position): vscode.ProviderResult<vscode.Hover>
 	{
 		this.currDoc = document;
 		this.hover = new Array<vscode.MarkdownString>();
@@ -148,7 +150,7 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 		this.GetProperties(document);
 		for (this.row=0;this.row<document.lineCount;this.row++)
 		{
-			const tree = this.parse(this.AdjustLine(document,this.labelSentry.labels.macros),"\n");
+			const tree = this.parse(this.AdjustLine(document,sharedLabels.macros),"\n");
 			this.walk(tree,this.get_hover.bind(this));
 			if (this.hover.length>0)
 				return new vscode.Hover(this.hover,this.range);

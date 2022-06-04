@@ -1,13 +1,11 @@
 import * as vscode from 'vscode';
 import * as lxbase from '../../langExtBase';
-import * as diagnostics from '../../diagnostics';
 import * as assert from 'assert';
 
 describe('Diagnostics: Processors', async function() {
 	//vscode.window.showInformationMessage('Start output statements');
 	this.beforeEach(async function() {
-		const TSInitResult = await lxbase.TreeSitterInit();
-		//this.prov = new diagnostics.TSDiagnosticProvider(TSInitResult);
+		await lxbase.TreeSitterInit();
 	});
 	it('65c02 disabled', async function() {
 		const v = vscode.workspace.getConfiguration('merlin6502')?.get('version');
@@ -68,8 +66,7 @@ describe('Diagnostics: Processors', async function() {
 describe('Diagnostics: Macros', async function() {
 	//vscode.window.showInformationMessage('Start output statements');
 	this.beforeEach(async function() {
-		const TSInitResult = await lxbase.TreeSitterInit();
-		//this.prov = new diagnostics.TSDiagnosticProvider(TSInitResult);
+		await lxbase.TreeSitterInit();
 	});
 	it('matches instruction', async function() {
 		const doc = await vscode.workspace.openTextDocument({content:'LDA MAC\nDO MAC\nLDX LDA #$00',language:'merlin6502'});
@@ -162,8 +159,7 @@ describe('Diagnostics: Macros', async function() {
 describe('Diagnostics: declarations', async function() {
 	//vscode.window.showInformationMessage('Start output statements');
 	this.beforeEach(async function() {
-		const TSInitResult = await lxbase.TreeSitterInit();
-		//this.prov = new diagnostics.TSDiagnosticProvider(TSInitResult);
+		await lxbase.TreeSitterInit();
 	});
 	it('undefined global', async function() {
 		const doc = await vscode.workspace.openTextDocument({content:'G1 EQU $00\n LDA G1\n LDA G2\n LDA G3\nG3 EQU $01',language:'merlin6502'});
@@ -238,8 +234,7 @@ describe('Diagnostics: declarations', async function() {
 describe('Diagnostics: locals', async function() {
 	//vscode.window.showInformationMessage('Start output statements');
 	this.beforeEach(async function() {
-		const TSInitResult = await lxbase.TreeSitterInit();
-		//this.prov = new diagnostics.TSDiagnosticProvider(TSInitResult);
+		await lxbase.TreeSitterInit();
 	});
 	it('no scope', async function() {
 		const doc = await vscode.workspace.openTextDocument({content:':G1 LDA $00',language:'merlin6502'});
@@ -355,7 +350,6 @@ describe('Diagnostics: locals', async function() {
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});
 	it('pseudo ops in macro', async function() {
-		const v = vscode.workspace.getConfiguration('merlin6502')?.get('version');
 		const doc = await vscode.workspace.openTextDocument({content:'mymac MAC\ne1 EXT\nent1 ENT\n SAV myfile',language:'merlin6502'});
 		const ed = await vscode.window.showTextDocument(doc);
 		if (!ed)

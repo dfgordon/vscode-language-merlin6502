@@ -24,7 +24,7 @@ export type SourceType = typeof SourceOptions[keyof typeof SourceOptions];
 
 function get_lang_path() : string
 {
-	let lang = 'tree-sitter-merlin6502';
+	const lang = 'tree-sitter-merlin6502';
 	return path.join(__dirname,lang+'.wasm');
 }
 
@@ -46,7 +46,6 @@ export async function LoadSources(doc: vscode.TextDocument): Promise<Array<vscod
 /// out Merlin versions as distinct parsers.
 export async function TreeSitterInit(): Promise<[Parser,Parser.Language]>
 {
-	const config = vscode.workspace.getConfiguration('merlin6502');
 	await Parser.init();
 	const parser = new Parser();
 	const Merlin6502 = await Parser.Language.load(get_lang_path());
@@ -69,6 +68,8 @@ export class LangExtBase
 	merlinVersion = 'v8';
 	linkerCount = 0;
 	caseSens = false;
+	foundNode : Parser.SyntaxNode | null = null;
+	searchPos : vscode.Position = new vscode.Position(0,0);
 	constructor(TSInitResult : [Parser,Parser.Language])
 	{
 		this.parser = TSInitResult[0];
@@ -194,22 +195,6 @@ export class LangExtBase
 		} while (choice!=WalkerOptions.exit && choice!=WalkerOptions.abort);
 		return choice;
 	}
-	visitOnlyXC(curs: Parser.TreeCursor) : WalkerChoice
-	{
-		const curr = curs.currentNode();
-		if (curr.type=='psop_xc')
-		{
-			if (curr.nextSibling && curr.nextSibling.text.toUpperCase()=='OFF')
-				this.xcCount = 0;
-			else
-				this.xcCount += 1;
-			if (this.xcCount>2)
-				this.xcCount = 2;
-		}
-		else if (curr.type.substring(0,3)=='op_' || curr.type.substring(0,5)=='psop_')
-			return WalkerOptions.abort;
-		return WalkerOptions.gotoChild;
-	}
 	visit_properties(curs: Parser.TreeCursor) : WalkerChoice
 	{
 		const curr = curs.currentNode();
@@ -221,20 +206,14 @@ export class LangExtBase
 				this.xcCount += 1;
 			if (this.xcCount>2)
 				this.xcCount = 2;
+			return WalkerOptions.exit;
 		}
 		if (curr.type=='label_ref' && curs.currentFieldName()=='mac' && ['LNK','LKV','ASM'].includes(curr.text.toUpperCase()))
-			this.linkerCount += 1;
-		return WalkerOptions.gotoChild;
-	}
-	GetOnlyXC(document: vscode.TextDocument)
-	{
-		for (let row=0;row<document.lineCount;row++)
 		{
-			const programLine = document.lineAt(row).text;
-			const tree = this.parse(programLine,"\n");
-			if (this.walk(tree,this.visitOnlyXC.bind(this))==WalkerOptions.abort)
-				break;
+			this.linkerCount += 1;
+			return WalkerOptions.exit;
 		}
+		return WalkerOptions.gotoChild;
 	}
 	GetProperties(document: vscode.TextDocument)
 	{
@@ -244,8 +223,28 @@ export class LangExtBase
 			const programLine = document.lineAt(row).text;
 			const tree = this.parse(programLine,"\n");
 			this.walk(tree,this.visit_properties.bind(this));
+			if (row>50)
+				break; // don't waste time in large files
 		}
 		this.set_reserved_words();
+	}
+	visit_find(curs: Parser.TreeCursor) : WalkerChoice
+	{
+		// go as deep as possible to find the smallest element
+		const rng = this.curs_to_range(curs,this.row,this.col);
+		if (rng.contains(this.searchPos))
+			this.foundNode = curs.currentNode();
+		return WalkerOptions.gotoChild;
+	}
+	GetNodeAtPosition(document: vscode.TextDocument,position: vscode.Position,macros: Map<string,any>) : Parser.SyntaxNode | null
+	{
+		this.row = position.line;
+		this.col = 0;
+		this.foundNode = null;
+		this.searchPos = position;
+		const tree = this.parse(this.AdjustLine(document,macros),"\n");
+		this.walk(tree,this.visit_find.bind(this));
+		return this.foundNode;
 	}
 	/// AdjustLine is used to let the parser know when an item
 	/// in the operator column is a previously defined macro name.

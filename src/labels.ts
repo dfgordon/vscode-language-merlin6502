@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import Parser, { SyntaxNode } from 'web-tree-sitter';
+import Parser from 'web-tree-sitter';
 import { LangExtBase, WalkerOptions, WalkerChoice, SourceOptions, SourceType } from './langExtBase';
 import * as path from 'path';
 
@@ -42,18 +42,18 @@ export class LabelNode
 
 export class LabelSet
 {
-	globals : Map<string,Array<LabelNode>> = new Map<string,Array<LabelNode>>();
-	locals : Map<string,Array<LabelNode>> = new Map<string,Array<LabelNode>>();
-	vars : Map<string,Array<LabelNode>> = new Map<string,Array<LabelNode>>();
-	macros : Map<string,Array<LabelNode>> = new Map<string,Array<LabelNode>>();
+	globals = new Map<string,Array<LabelNode>>();
+	locals = new Map<string,Array<LabelNode>>();
+	vars = new Map<string,Array<LabelNode>>();
+	macros = new Map<string,Array<LabelNode>>();
+	entries = new Map<string,Array<LabelNode>>();
 }
 
-export class LabelSentry extends LangExtBase
+export class LabelSentry extends LangExtBase implements vscode.DeclarationProvider, vscode.DocumentSymbolProvider
 {
 	diag = new Array<vscode.Diagnostic>();
 	labels = new LabelSet();
 	running = new Set<string>();
-	entries = new Map<string,Array<LabelNode>>();
 	inMacro = false;
 	currScope = '';
 	docs = new Array<vscode.TextDocument>();
@@ -63,7 +63,7 @@ export class LabelSentry extends LangExtBase
 	async prepare_externals(docs: vscode.Uri[])
 	{
 		this.docs = new Array<vscode.TextDocument>();
-		for (let uri of docs)
+		for (const uri of docs)
 			this.docs.push(await vscode.workspace.openTextDocument(uri));
 	}
 	/// Gather all labels while checking for redefinitions.
@@ -215,7 +215,9 @@ export class LabelSentry extends LangExtBase
 	build_main(document: vscode.TextDocument)
 	{
 		this.GetProperties(document);
+		const saveEntries = this.labels.entries;
         this.labels = new LabelSet();
+		this.labels.entries = saveEntries;
 		this.running = new Set<string>();
 		this.currDoc = null;
 		this.currScope = '';
@@ -241,7 +243,7 @@ export class LabelSentry extends LangExtBase
 		// correlate EXT and ENT
 		for (const [lbl,lst] of this.labels.globals)
 			for (const lnode of lst)
-				if (lnode.isExternal && !this.entries.has(lbl))
+				if (lnode.isExternal && !this.labels.entries.has(lbl))
 					this.diag.push(new vscode.Diagnostic(lnode.rng,'no corresponding entry was found in the workspace',vscode.DiagnosticSeverity.Warning));
 	}
 	process_include(fileNode: Parser.SyntaxNode | null, newType: SourceType, dispatch: (curs: Parser.TreeCursor) => WalkerChoice)
@@ -288,30 +290,75 @@ export class LabelSentry extends LangExtBase
 		{
 			const child1 = curs.currentNode().firstNamedChild;
 			if (child1 && child1.type=='label_def' && child1.nextNamedSibling && child1.nextNamedSibling.type=='psop_ent')
-				AddLabel(child1.text,new LabelNode(this.currDoc,child1,this.node_to_range(child1,this.row,this.col)),this.entries);
+				AddLabel(child1.text,new LabelNode(this.currDoc,child1,this.node_to_range(child1,this.row,this.col)),this.labels.entries);
 			if (child1 && child1.type=='psop_ent')
 			{
 				let sib = child1.nextNamedSibling;
 				while (sib && sib.type=='label_ref')
 				{
-					AddLabel(sib.text,new LabelNode(this.currDoc,sib,this.node_to_range(sib,this.row,this.col)),this.entries);
+					AddLabel(sib.text,new LabelNode(this.currDoc,sib,this.node_to_range(sib,this.row,this.col)),this.labels.entries);
 					sib = sib.nextNamedSibling;
 				}
 			}
 		}
 		return WalkerOptions.exit;
 	}
-	scan_entries()
+	scan_entries(excl: vscode.TextDocument)
 	{
-		this.entries = new Map<string,Array<LabelNode>>();
+		this.labels.entries = new Map<string,Array<LabelNode>>();
 		for (const document of this.docs)
 		{
+			if (document==excl)
+				continue;
 			this.currDoc = document;
 			for (this.row=0;this.row<document.lineCount;this.row++)
 			{
+				if (document.lineAt(this.row).text.search(/^\S*\s+ENT/i)==-1)
+					continue; // maybe save some time
 				const tree = this.parse(this.AdjustLine(document,this.labels.macros),"\n");
 				this.walk(tree,this.visit_entries.bind(this));
 			}
 		}
+	}
+	AddDeclarations(locs: vscode.Location[],doc: vscode.TextDocument,txt: string,decs: Map<string,Array<LabelNode>>)
+	{
+		for (const [nm,lst] of decs)
+			if (nm==txt)
+				for (const node of lst)
+				{
+					const uri = node.doc ? node.doc.uri : doc.uri
+					if (node.isDef)
+						locs.push(new vscode.Location(uri,node.rng));
+				}
+	}
+	public provideDeclaration(document: vscode.TextDocument, position: vscode.Position): vscode.ProviderResult<vscode.Declaration> 
+	{
+		const ans : vscode.Location[] = [];
+		const refNode = this.GetNodeAtPosition(document,position,this.labels.macros);
+		if (!refNode)
+			return ans;
+		this.AddDeclarations(ans,document,refNode.text,this.labels.globals);
+		this.AddDeclarations(ans,document,refNode.text,this.labels.macros);
+		return ans;
+	}
+	AddSymbols(sym: vscode.DocumentSymbol[],doc: vscode.TextDocument,typ: string,decs: Map<string,Array<LabelNode>>)
+	{
+		for (const [nm,lst] of decs)
+			for (const node of lst)
+			{
+				if (node.doc && node.doc.uri!=doc.uri)
+					continue;
+				if (node.isDef && typ=='global')
+					sym.push(new vscode.DocumentSymbol(nm,'global',vscode.SymbolKind.Constant,node.rng,node.rng));
+				if (node.isDef && typ=='macro')
+					sym.push(new vscode.DocumentSymbol(nm,'macro',vscode.SymbolKind.Function,node.rng,node.rng));
+			}
+	}
+	public provideDocumentSymbols(document: vscode.TextDocument): vscode.ProviderResult<vscode.DocumentSymbol[]>
+	{
+		const sym : vscode.DocumentSymbol[] = [];
+		this.AddSymbols(sym,document,'global',this.labels.globals);
+		this.AddSymbols(sym,document,'macro',this.labels.macros);
+		return sym;
 	}
 }

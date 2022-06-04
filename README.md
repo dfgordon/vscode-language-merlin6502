@@ -120,9 +120,12 @@ This capability only applies to MacOS. Note that [Virtual \]\[](https://virtuali
 * VS Code
     - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
     - tab your way to the end of snippets
+    - to mitigate diagnostic delay, break large source files into smaller modules
+    - diagnostic updates are forced by new line, or saving the document
 * Disassembly
     - verify that the starting address is aligned with an instruction opcode
     - stop disassembly before start of data
+    - adjust handling of BRK instruction in settings
 * Merlin
     - restore the configuration defaults, especially memory banks
     - use the 128K version of Merlin 8

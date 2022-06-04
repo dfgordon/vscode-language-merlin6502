@@ -1,14 +1,12 @@
-import * as vscode from 'vscode';
 import * as lxbase from '../../langExtBase';
-import * as labels from '../../labels';
+import * as vscode from 'vscode';
 import * as com from '../../commands';
 import * as assert from 'assert';
 
 describe('6502 Disassembly: octet ops', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		const labelSentry = new labels.LabelSentry(TSInitResult);
-		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
+		this.disTool = new com.DisassemblyTool(TSInitResult);
 	});
 	it('adc', async function() {
         const hexInput = '6900650075006d00107d001079001061007100';
@@ -120,8 +118,7 @@ describe('6502 Disassembly: octet ops', async function() {
 describe('6502 Disassembly: store ops', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		const labelSentry = new labels.LabelSentry(TSInitResult);
-		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
+		this.disTool = new com.DisassemblyTool(TSInitResult);
 	});
 	it('sta', async function() {
         const hexInput = '850095008d00109d001099001081009100';
@@ -162,8 +159,7 @@ describe('6502 Disassembly: store ops', async function() {
 describe('6502 Disassembly: index ops', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		const labelSentry = new labels.LabelSentry(TSInitResult);
-		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
+		this.disTool = new com.DisassemblyTool(TSInitResult);
 	});
 	it('cpx', async function() {
         const hexInput = 'e000e400ec0010';
@@ -214,8 +210,7 @@ describe('6502 Disassembly: index ops', async function() {
 describe('6502 Disassembly: branching', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		const labelSentry = new labels.LabelSentry(TSInitResult);
-		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
+		this.disTool = new com.DisassemblyTool(TSInitResult);
 	});
 	it('forward branch', async function() {
         const hexInput = '907fb010f0003000d000100050007000';
@@ -264,8 +259,7 @@ describe('6502 Disassembly: branching', async function() {
 describe('6502 Disassembly: short ops', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		const labelSentry = new labels.LabelSentry(TSInitResult);
-		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
+		this.disTool = new com.DisassemblyTool(TSInitResult);
 	});
 	it('status', async function() {
         const hexInput = '18d858b838f878';
@@ -321,21 +315,36 @@ describe('6502 Disassembly: short ops', async function() {
         assert.strictEqual(actualCode,expectedCode);
 	});
 	it('other', async function() {
+		const brk : boolean | undefined = vscode.workspace.getConfiguration('merlin6502')?.get('disassembly.brk');
         const hexInput = '0000EA';
         const binaryInput = Buffer.from(hexInput,"hex");
-        const expectedCode =
-            '\tBRK\t#$00\n' +
-            '\tNOP\n';
-        const actualCode = this.disTool.disassemble(binaryInput,[0,hexInput.length/2],0,'none');
-        assert.strictEqual(actualCode,expectedCode);
+        if (brk)
+        {
+            const expectedCode =
+                '\tBRK\t#$00\n' +
+                '\tNOP\n';
+            const actualCode = this.disTool.disassemble(binaryInput,[0,hexInput.length/2],0,'none');
+            assert.strictEqual(actualCode,expectedCode);
+        }
+        else if (brk==false)
+        {
+            const expectedCode =
+                '\tDFB\t$00\n' +
+                '\tDFB\t$00\n' +
+                '\tNOP\n';
+            const actualCode = this.disTool.disassemble(binaryInput,[0,hexInput.length/2],0,'none');
+            assert.strictEqual(actualCode,expectedCode);
+        }
+        else {
+            assert.fail('could not get configuration');
+        }
 	});
 });
 
 describe('6502 Disassembly: bitwise', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		const labelSentry = new labels.LabelSentry(TSInitResult);
-		this.disTool = new com.DisassemblyTool(TSInitResult,labelSentry);
+		this.disTool = new com.DisassemblyTool(TSInitResult);
 	});
 	it('asl', async function() {
         const hexInput = '0a060016000e00101e0010';
