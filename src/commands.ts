@@ -51,6 +51,7 @@ export class FormattingTool extends lxbase.LangExtBase implements vscode.OnTypeF
 	callToken = '\u0100';
 	persistentSpace = '\u0100';
 	widths = [9, 6, 11];
+	doNotFormat = ['dstring', 'comment_text','literal'];
 	// following taken from completions and has extra info.
 	// here we only need to know if the value is empty or not.
 	complMap = Object({
@@ -229,6 +230,15 @@ export class FormattingTool extends lxbase.LangExtBase implements vscode.OnTypeF
 		const stop1 = this.widths[0];
 		const stop2 = this.widths[0] + this.widths[1];
 		const stop3 = this.widths[0] + this.widths[1] + this.widths[2];
+		const node = this.GetNodeAtPosition(document, position.translate(0,-1), this.labelSentry.shared.macros);
+		if (node)
+		{
+			const parent = node.parent;
+			if (this.doNotFormat.includes(node.type))
+				return [];
+			if (parent && this.doNotFormat.includes(parent.type))
+				return [];
+		}
 		if (ch==' ')
 		{
 			const txt = document.lineAt(position.line).text.substring(0,position.character);
@@ -245,7 +255,7 @@ export class FormattingTool extends lxbase.LangExtBase implements vscode.OnTypeF
 		}
 		if (ch == ';' && document.lineAt(position.line).text.charAt(position.character-2)==' ')
 		{
-			if (position.character < stop3)
+			if (position.character <= stop3)
 				return [new vscode.TextEdit(new vscode.Range(position.translate(0,-1), position), ' '.repeat(stop3 - position.character + 1) + ';')];
 		}
 		return [];
