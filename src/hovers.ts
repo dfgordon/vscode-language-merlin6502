@@ -2,11 +2,12 @@ import * as vscode from 'vscode';
 import Parser from 'web-tree-sitter';
 import { AddressHovers } from './hoversAddresses';
 import { OpcodeHovers, PseudoOpcodeHovers } from './hoversStatements';
-import { sharedLabels } from './extension';
 import * as lxbase from './langExtBase';
+import * as labels from './labels';
 
 export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverProvider
 {
+	labelSentry: labels.LabelSentry;
 	addresses = new AddressHovers();
 	opcodes = new OpcodeHovers();
 	pseudo = new PseudoOpcodeHovers();
@@ -14,6 +15,11 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 	position = new vscode.Position(0,0);
 	range = new vscode.Range(new vscode.Position(0,0),new vscode.Position(0,0));
 	currDoc : vscode.TextDocument | null = null;
+	constructor(TSInitResult : [Parser,Parser.Language], sentry: labels.LabelSentry)
+	{
+		super(TSInitResult);
+		this.labelSentry = sentry;
+	}
 
 	parse_merlin_number(num_str:string) : number
 	{
@@ -90,9 +96,9 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 			}
 			if (curs.nodeType=='label_ref' && curs.currentNode().firstChild?.type=='global_label')
 			{
-				let nodes = sharedLabels.globals.get(curs.nodeText);
+				let nodes = this.labelSentry.shared.globals.get(curs.nodeText);
 				if (!nodes)
-					nodes = sharedLabels.macros.get(curs.nodeText);
+					nodes = this.labelSentry.shared.macros.get(curs.nodeText);
 				if (!nodes)
 					return lxbase.WalkerOptions.exit;
 				for (const node of nodes)
@@ -116,7 +122,7 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 			if (curs.nodeType=='label_def' && curs.currentNode().firstChild?.type=='global_label')
 			{
 				const next = curs.currentNode().nextNamedSibling;
-				const entries = sharedLabels.entries.get(curs.nodeText);
+				const entries = this.labelSentry.shared.entries.get(curs.nodeText);
 				this.hover.push(new vscode.MarkdownString('defined right here'));
 				if (!entries)
 					return lxbase.WalkerOptions.exit;
@@ -150,7 +156,7 @@ export class TSHoverProvider extends lxbase.LangExtBase implements vscode.HoverP
 		this.GetProperties(document);
 		for (this.row=0;this.row<document.lineCount;this.row++)
 		{
-			const tree = this.parse(this.AdjustLine(document,sharedLabels.macros),"\n");
+			const tree = this.parse(this.AdjustLine(document,this.labelSentry.shared.macros),"\n");
 			this.walk(tree,this.get_hover.bind(this));
 			if (this.hover.length>0)
 				return new vscode.Hover(this.hover,this.range);

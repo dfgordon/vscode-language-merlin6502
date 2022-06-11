@@ -102,6 +102,11 @@
 					"type": "boolean",
 					"default": false,
 					"markdownDescription": "Recognize BRK instruction and operand during disassembly"
+				},
+				"merlin6502.diagnostics.live": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Update diagnostics on any document change.  If not, then only update on save document.  If you are editing large files it may be helpful to uncheck this."
 				}
 			}
 		},

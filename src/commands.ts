@@ -6,8 +6,9 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import { platform } from 'os';
 import * as opcodes from './opcodes.json';
+import * as pseudo from './pseudo_opcodes.json';
 import * as Parser from 'web-tree-sitter';
-import { sharedLabels } from './extension';
+import * as labels from './labels';
 
 type OpData =
 {
@@ -22,13 +23,14 @@ type OpData =
 	immediate : boolean
 }
 
-async function proceedDespiteErrors(document: vscode.TextDocument,actionDesc: string) : Promise<boolean>
+async function proceedDespiteErrors(document: vscode.TextDocument,actionDesc: string,rng: vscode.Range | undefined) : Promise<boolean>
 {
 	const collection = vscode.languages.getDiagnostics(document.uri);
 	let err = false;
 	collection.forEach(d => {
 		if (d.severity==vscode.DiagnosticSeverity.Error)
-			err = true;
+			if (!rng || (rng && d.range.start.line >= rng.start.line && d.range.end.line <= rng.end.line ))
+				err = true;
 	});
 	if (err)
 	{
@@ -41,13 +43,218 @@ async function proceedDespiteErrors(document: vscode.TextDocument,actionDesc: st
 	return true;
 }
 
-export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBase here?
+export class FormattingTool extends lxbase.LangExtBase implements vscode.OnTypeFormattingEditProvider, vscode.DocumentRangeFormattingEditProvider
 {
-	disassemblyMap : Map<number,OpData>;
+	labelSentry: labels.LabelSentry;
 	formattedLine = "";
 	formattedCode = "";
 	callToken = '\u0100';
 	persistentSpace = '\u0100';
+	widths = [9, 6, 11];
+	// following taken from completions and has extra info.
+	// here we only need to know if the value is empty or not.
+	complMap = Object({
+		'imm': '#${0:imm}',
+		'abs': '${0:abs}',
+		'zp': '${0:zp}',
+		'rel': '${0:rel}',
+		'rell': '${0:rell}',
+		'absl': '${0:absl}',
+		'(zp,x)': '(${1:zp},x)$0',
+		'(abs,x)': '(${1:abs},x)$0',
+		'(zp),y': '(${1:zp}),y$0',
+		'zp,x': '${1:zp},x$0',
+		'abs,x': '${1:abs},x$0',
+		'absl,x': '${1:absl},x$0',
+		'zp,y': '${1:zp},y$0',
+		'abs,y': '${1:abs},y$0',
+		'(abs)': '(${1:abs})$0',
+		'(zp)': '(${1:zp})$0',
+		'[d]': '[${1:d}]$0',
+		'[d],y': '[${1:d}],y$0',
+		'd,s': '${1:d},s$0',
+		'(d,s),y': '(${1:d},s),y$0',
+		'xyc': '${1:dstbnk},${0:srcbnk}',
+		'impl': '',
+		'accum': '',
+		's': ''
+	});
+	constructor(TSInitResult : [Parser,Parser.Language], sentry: labels.LabelSentry)
+	{
+		super(TSInitResult);
+		this.labelSentry = sentry;
+		this.set_widths();
+	}
+	set_widths()
+	{
+		this.config = vscode.workspace.getConfiguration('merlin6502');
+		this.widths = [
+			this.config.get('columns.c1') as number,
+			this.config.get('columns.c2') as number,
+			this.config.get('columns.c3') as number
+		]
+	}
+	is_completion(doc: vscode.TextDocument, op: string) : boolean
+	{
+		this.GetProperties(doc);
+		const req = ['6502','65c02','65c816'][this.xcCount];
+		const psopInfo = Object(pseudo)[op.toLowerCase()];
+		const opInfo = Object(opcodes)[op.toLowerCase()];
+		if (opInfo)
+		{
+			const modeList = opInfo.modes;
+			for (const mode of modeList)
+			{
+				const snip = this.complMap[mode.addr_mnemonic];
+				if (mode.processors.includes(req) && snip && snip.length > 0)
+					return true;
+			}
+		}
+		if (psopInfo)
+		{
+			const args : string[] = psopInfo.enum;
+			let v8x : string = psopInfo.v8x;
+			let v16x : string = psopInfo.v16x;
+			v8x = v8x?.substring(1,v8x.length-1);
+			v16x = v16x?.substring(1,v16x.length-1);
+			if (args)
+			{
+				for (const s of args)
+				{
+					if (s.length>0)
+					{
+						const unsupported = (v8x && this.merlinVersion=='v8' && s.match(RegExp(v8x,'i'))) ||
+							(v16x && this.merlinVersion=='v16' && s.match(RegExp(v16x,'i')));
+						if (!unsupported)
+							return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	replace_curs(newNodeText: string, curs: Parser.TreeCursor) : string
+	{
+		const preNode = this.formattedLine.substring(0,curs.startPosition.column);
+		const postNode = this.formattedLine.substring(curs.endPosition.column);
+		return preNode + newNodeText + ' '.repeat(curs.nodeText.length-newNodeText.length) + postNode;
+	}
+	format_node(curs: Parser.TreeCursor) : lxbase.WalkerChoice
+	{
+		// Persistent spaces
+		if (['literal_arg','dstring','dos33','literal','comment_text'].includes(curs.nodeType))
+			this.formattedLine = this.replace_curs(curs.nodeText.replace(/ /g,this.persistentSpace),curs);
+		return lxbase.WalkerOptions.gotoChild;
+	}
+	async showPasteableProgram()
+	{
+		let verified = this.verify_document();
+		if (!verified)
+			return;
+		const proceed = await proceedDespiteErrors(verified.doc,'Formatting',undefined);
+		if (!proceed)
+			return;
+		verified = this.verify_document();
+		if (!verified)
+			return;
+		this.GetProperties(verified.doc);
+		this.formattedCode = '';
+		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
+		{
+			this.formattedLine = this.AdjustLine(verified.doc,this.labelSentry.shared.macros);
+			const tree = this.parse(this.formattedLine,"\n");
+			this.walk(tree,this.format_node.bind(this));
+			this.formattedCode += this.formattedLine.
+				replace(RegExp('^'+this.callToken),'').
+				replace(/\s+/g,' ').
+				replace(RegExp(this.persistentSpace,'g'),' ');
+			this.formattedCode += '\n';
+		}
+		vscode.workspace.openTextDocument({content:this.formattedCode,language:'merlin6502'}).then(doc => {
+			vscode.window.showTextDocument(doc);
+		});
+	}
+	async resizeColumns()
+	{
+		vscode.window.showInformationMessage('Command is retired, please use native VS Code formatting commands');
+	}
+	async provideDocumentRangeFormattingEdits(document: vscode.TextDocument, range: vscode.Range): Promise<vscode.TextEdit[]>
+	{
+		let verified = this.verify_document();
+		if (!verified || verified.doc!=document)
+			return [];
+		const proceed = await proceedDespiteErrors(verified.doc,'Formatting',range);
+		if (!proceed)
+			return [];
+		verified = this.verify_document();
+		if (!verified || verified.doc!=document)
+			return [];
+		this.GetProperties(verified.doc);
+		const sel = range;
+		let formattedDoc = ''
+		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
+		{
+			if (sel.isEmpty || (this.row>=sel.start.line && this.row<=sel.end.line))
+			{
+				this.formattedLine = this.AdjustLine(verified.doc,this.labelSentry.shared.macros);
+				const tree = this.parse(this.formattedLine,"\n");
+				this.walk(tree,this.format_node.bind(this));
+				this.formattedLine = this.formattedLine.replace(RegExp('^'+this.callToken),'').replace(/\s+/g,' ');
+				const cols = this.formattedLine.split(' ');
+				this.formattedLine = '';
+				for (let i=0;i<cols.length;i++)
+				{
+					let prepadding = 0;
+					if (cols[i].charAt(0)==';')
+						for (let j=i;j<3;j++)
+							prepadding += this.widths[j];
+					const padding = this.widths[i] - cols[i].length;
+					this.formattedLine += ' '.repeat(prepadding) + cols[i] + (padding>0 ? ' '.repeat(padding) : ' ');
+				}
+				this.formattedLine = this.formattedLine.trimEnd().replace(RegExp(this.persistentSpace,'g'),' ');
+				formattedDoc += this.formattedLine;
+			}
+			else
+				formattedDoc += verified.doc.lineAt(this.row).text;
+			if (this.row<verified.doc.lineCount-1)
+				formattedDoc += '\n'
+		}
+		const start = new vscode.Position(0,0);
+		const end = new vscode.Position(verified.doc.lineCount, 0);
+		return [new vscode.TextEdit(new vscode.Range(start, end), formattedDoc)];
+	}
+	public provideOnTypeFormattingEdits(document: vscode.TextDocument, position: vscode.Position, ch: string): vscode.ProviderResult<vscode.TextEdit[]>
+	{
+		const stop1 = this.widths[0];
+		const stop2 = this.widths[0] + this.widths[1];
+		const stop3 = this.widths[0] + this.widths[1] + this.widths[2];
+		if (ch==' ')
+		{
+			const txt = document.lineAt(position.line).text.substring(0,position.character);
+			const c2 = txt.match(/^\S*\s+$/);
+			const c3 = txt.match(/^\S*\s+(\S+)\s*$/);
+			if (c2 && position.character < stop1)
+				return [new vscode.TextEdit(new vscode.Range(position, position), ' '.repeat(stop1 - position.character))];
+			if (c3 && position.character < stop2) {
+				// here we only advance if there is no completion available.
+				// if there is a completion, we have to let the completion handle the advance.
+				if (c3 && !this.is_completion(document,c3[1]))
+					return [new vscode.TextEdit(new vscode.Range(position, position), ' '.repeat(stop2 - position.character))];
+			}
+		}
+		if (ch == ';' && document.lineAt(position.line).text.charAt(position.character-2)==' ')
+		{
+			if (position.character < stop3)
+				return [new vscode.TextEdit(new vscode.Range(position.translate(0,-1), position), ' '.repeat(stop3 - position.character + 1) + ';')];
+		}
+		return [];
+	}
+}
+
+export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBase here?
+{
+	disassemblyMap : Map<number,OpData>;
 	constructor(TSInitResult : [Parser,Parser.Language])
 	{
 		super(TSInitResult);
@@ -122,12 +329,6 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 	{
 		const rawBinary = new Uint8Array(this.buffer_from_raw_str(raw_str));
 		return [...rawBinary].map(b => b.toString(16).toUpperCase().padStart(2,"0")).join("");
-	}
-	replace_curs(newNodeText: string, curs: Parser.TreeCursor) : string
-	{
-		const preNode = this.formattedLine.substring(0,curs.startPosition.column);
-		const postNode = this.formattedLine.substring(curs.endPosition.column);
-		return preNode + newNodeText + ' '.repeat(curs.nodeText.length-newNodeText.length) + postNode;
 	}
 	async getAddressInput(name: string,min:number,max:number) : Promise<number | undefined>
 	{
@@ -371,91 +572,5 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 				this.insertCode(params,fs.readFileSync(dumpPath),undefined);
 			}
 		});
-	}
-	format_node(curs: Parser.TreeCursor) : lxbase.WalkerChoice
-	{
-		// Persistent spaces
-		if (['literal_arg','dstring','dos33','literal','comment_text'].includes(curs.nodeType))
-			this.formattedLine = this.replace_curs(curs.nodeText.replace(/ /g,this.persistentSpace),curs);
-		return lxbase.WalkerOptions.gotoChild;
-	}
-	async showPasteableProgram()
-	{
-		let verified = this.verify_document();
-		if (!verified)
-			return;
-		const proceed = await proceedDespiteErrors(verified.doc,'Formatting');
-		if (!proceed)
-			return;
-		verified = this.verify_document();
-		if (!verified)
-			return;
-		this.GetProperties(verified.doc);
-		this.formattedCode = '';
-		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
-		{
-			this.formattedLine = this.AdjustLine(verified.doc,sharedLabels.macros);
-			const tree = this.parse(this.formattedLine,"\n");
-			this.walk(tree,this.format_node.bind(this));
-			this.formattedCode += this.formattedLine.
-				replace(RegExp('^'+this.callToken),'').
-				replace(/\s+/g,' ').
-				replace(RegExp(this.persistentSpace,'g'),' ');
-			this.formattedCode += '\n';
-		}
-		vscode.workspace.openTextDocument({content:this.formattedCode,language:'merlin6502'}).then(doc => {
-			vscode.window.showTextDocument(doc);
-		});
-	}
-	async resizeColumns()
-	{
-		let verified = this.verify_document();
-		if (!verified)
-			return;
-		const proceed = await proceedDespiteErrors(verified.doc,'Formatting');
-		if (!proceed)
-			return;
-		this.config = vscode.workspace.getConfiguration('merlin6502');
-		const widths = [
-			this.config.get('columns.c1') as number,
-			this.config.get('columns.c2') as number,
-			this.config.get('columns.c3') as number
-		]
-		verified = this.verify_document();
-		if (!verified)
-			return;
-		this.GetProperties(verified.doc);
-		const sel = verified.ed.selection;
-		let formattedDoc = ''
-		for (this.row=0;this.row<verified.doc.lineCount;this.row++)
-		{
-			if (sel.isEmpty || (this.row>=sel.start.line && this.row<sel.end.line))
-			{
-				this.formattedLine = this.AdjustLine(verified.doc,sharedLabels.macros);
-				const tree = this.parse(this.formattedLine,"\n");
-				this.walk(tree,this.format_node.bind(this));
-				this.formattedLine = this.formattedLine.replace(RegExp('^'+this.callToken),'').replace(/\s+/g,' ');
-				const cols = this.formattedLine.split(' ');
-				this.formattedLine = '';
-				for (let i=0;i<cols.length;i++)
-				{
-					let prepadding = 0;
-					if (cols[i].charAt(0)==';')
-						for (let j=i;j<3;j++)
-							prepadding += widths[j];
-					const padding = widths[i] - cols[i].length;
-					this.formattedLine += ' '.repeat(prepadding) + cols[i] + (padding>0 ? ' '.repeat(padding) : ' ');
-				}
-				this.formattedLine = this.formattedLine.trimEnd().replace(RegExp(this.persistentSpace,'g'),' ');
-				formattedDoc += this.formattedLine;
-			}
-			else
-				formattedDoc += verified.doc.lineAt(this.row).text;
-			if (this.row<verified.doc.lineCount-1)
-				formattedDoc += '\n'
-		}
-		const start = new vscode.Position(0,0);
-		const end = new vscode.Position(verified.doc.lineCount,0);
-		verified.ed.edit( edit => { edit.replace(new vscode.Range(start,end),formattedDoc) } );
 	}
 }

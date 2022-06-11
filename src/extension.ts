@@ -3,11 +3,9 @@ import * as lxbase from './langExtBase';
 import { TSHoverProvider } from './hovers';
 import { TSDiagnosticProvider } from './diagnostics';
 import { DocTokensProvider, legend, RangeTokensProvider } from './semanticTokens';
-import { LabelSentry, LabelSet } from './labels'
+import { LabelSentry } from './labels'
 import * as completions from './completions';
 import * as com from './commands';
-
-export let sharedLabels = new LabelSet();
 
 /// This function runs when the extension loads.
 /// It creates the parser object, sets up the providers, and sets up event callbacks.
@@ -15,16 +13,18 @@ export function activate(context: vscode.ExtensionContext)
 {
 	lxbase.TreeSitterInit().then( TSInitResult =>
 	{
+		let liveDiagnostics = vscode.workspace.getConfiguration('merlin6502').get('diagnostics.live') as boolean;
 		const selector = { language: 'merlin6502' };
 		const collection = vscode.languages.createDiagnosticCollection('merlin6502-file');
 		const labelSentry = new LabelSentry(TSInitResult);
 		const diagnostics = new TSDiagnosticProvider(TSInitResult,labelSentry);
-		const rngTokens = new RangeTokensProvider(TSInitResult);
-		const docTokens = new DocTokensProvider(TSInitResult);
-		const hovers = new TSHoverProvider(TSInitResult);
-		const snippetCompletions = new completions.TSCompletionProvider(TSInitResult);
+		const rngTokens = new RangeTokensProvider(TSInitResult,labelSentry);
+		const docTokens = new DocTokensProvider(TSInitResult,labelSentry);
+		const hovers = new TSHoverProvider(TSInitResult,labelSentry);
+		const snippetCompletions = new completions.TSCompletionProvider(TSInitResult,labelSentry);
 		const addressCompletions = new completions.AddressCompletionProvider();
 		const disassembler = new com.DisassemblyTool(TSInitResult);
+		const formatter = new com.FormattingTool(TSInitResult,labelSentry);
 
 		const versionIndicator = vscode.window.createStatusBarItem();
 		const typeIndicator = vscode.window.createStatusBarItem();
@@ -53,26 +53,33 @@ export function activate(context: vscode.ExtensionContext)
 		}
 		let rngTokDisposable = vscode.languages.registerDocumentRangeSemanticTokensProvider(selector,rngTokens,legend);
 		let docTokDisposable = vscode.languages.registerDocumentSemanticTokensProvider(selector,docTokens,legend);
-		vscode.languages.registerHoverProvider(selector,hovers);
-		vscode.languages.registerCompletionItemProvider(selector,snippetCompletions,':',']',' ');
-		vscode.languages.registerCompletionItemProvider(selector,addressCompletions,'$');
-		vscode.languages.registerDeclarationProvider(selector,labelSentry);
+		const hovDisposable = vscode.languages.registerHoverProvider(selector,hovers);
+		const complDisposable = vscode.languages.registerCompletionItemProvider(selector,snippetCompletions,':',']',' ');
+		const addrDisposable = vscode.languages.registerCompletionItemProvider(selector,addressCompletions,'$');
+		const decDisposable = vscode.languages.registerDeclarationProvider(selector,labelSentry);
 		let docSymDisposable = vscode.languages.registerDocumentSymbolProvider(selector,labelSentry);
+		const refDisposable = vscode.languages.registerReferenceProvider(selector,labelSentry);
+		const editDisposable = vscode.languages.registerOnTypeFormattingEditProvider(selector,formatter,' ',';');
+		const rngDisposable = vscode.languages.registerDocumentRangeFormattingEditProvider(selector, formatter);
+		
+		context.subscriptions.push(rngTokDisposable);
+		context.subscriptions.push(docTokDisposable);
+		context.subscriptions.push(hovDisposable);
+		context.subscriptions.push(complDisposable);
+		context.subscriptions.push(addrDisposable);
+		context.subscriptions.push(decDisposable);
+		context.subscriptions.push(docSymDisposable);
+		context.subscriptions.push(refDisposable);
+		context.subscriptions.push(editDisposable);
+		context.subscriptions.push(rngDisposable);
 
 		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",disassembler.getFrontVirtualII,disassembler));
 		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",disassembler.getAppleWinSaveState,disassembler));
-		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",disassembler.showPasteableProgram,disassembler));
-		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.columns",disassembler.resizeColumns,disassembler));
+		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",formatter.showPasteableProgram,formatter));
+		context.subscriptions.push(vscode.commands.registerCommand("merlin6502.columns", formatter.resizeColumns, formatter));
+		
 		context.subscriptions.push(collection);
 
-		context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(listener => {
-			if (listener)
-			{
-				sharedLabels = diagnostics.labelSentry.labels;
-				// docSymDisposable.dispose();
-				// docSymDisposable = vscode.languages.registerDocumentSymbolProvider(selector,labelSentry);
-			}
-		}));
 		context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
 			if (editor?.document.languageId=='merlin6502')
 			{
@@ -83,7 +90,7 @@ export function activate(context: vscode.ExtensionContext)
 						labelSentry.prepare_externals(docs).then( () => {
 							labelSentry.GetProperties(editor.document);
 							labelSentry.scan_entries(editor.document);
-							diagnostics.update(editor.document,collection,versionIndicator,typeIndicator,true);
+							diagnostics.update(editor.document, collection, versionIndicator, typeIndicator, true);
 							docSymDisposable = vscode.languages.registerDocumentSymbolProvider(selector,labelSentry);
 						}).catch(reason => {
 							vscode.window.showErrorMessage('Could not analyze project sources:\n'+reason)
@@ -104,7 +111,7 @@ export function activate(context: vscode.ExtensionContext)
 				diagnostics.update(listener.document,collection,versionIndicator,typeIndicator,true);
 		}));
 		context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(listener => {
-			if (listener && listener.document.languageId=='merlin6502')
+			if (liveDiagnostics && listener && listener.document.languageId=='merlin6502')
 			{
 				let entered = false;
 				for (const change of listener.contentChanges)
@@ -115,7 +122,10 @@ export function activate(context: vscode.ExtensionContext)
 		context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(listener => {
 			if (listener)
 			{
+				liveDiagnostics = vscode.workspace.getConfiguration('merlin6502').get('diagnostics.live') as boolean;
 				addressCompletions.rebuild();
+				formatter.set_widths();
+				snippetCompletions.set_widths();
 				versionIndicator.text = vscode.workspace.getConfiguration('merlin6502').get('version') as string;
 				rngTokDisposable.dispose();
 				docTokDisposable.dispose();

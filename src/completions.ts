@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
+import * as Parser from 'web-tree-sitter';
 import * as specialAddresses from './specialAddresses.json';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
 import * as lxbase from './langExtBase';
-import { sharedLabels } from './extension';
+import * as labels from './labels';
 
 export class AddressCompletionProvider implements vscode.CompletionItemProvider
 {
@@ -90,6 +91,8 @@ export class AddressCompletionProvider implements vscode.CompletionItemProvider
 
 export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.CompletionItemProvider
 {
+	labelSentry: labels.LabelSentry;
+	formatOnType: boolean = false;
 	complMap = Object({
 		'imm': '#${0:imm}',
 		'abs': '${0:abs}',
@@ -116,12 +119,30 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 		'accum': '',
 		's': ''
 	});
-	modify(s:string)
+	widths = [9, 6, 11];
+	constructor(TSInitResult : [Parser,Parser.Language], sentry: labels.LabelSentry)
 	{
+		super(TSInitResult);
+		this.labelSentry = sentry;
+		this.set_widths();
+	}
+	set_widths()
+	{
+		this.formatOnType = vscode.workspace.getConfiguration('editor').get('formatOnType') as boolean;
+		this.config = vscode.workspace.getConfiguration('merlin6502');
+		this.widths = [
+			this.config.get('columns.c1') as number,
+			this.config.get('columns.c2') as number,
+			this.config.get('columns.c3') as number
+		]
+	}
+	modify(s:string,padreq:number)
+	{
+		const pad = this.formatOnType ? padreq : 0;
 		if (this.config.get('case.lowerCaseCompletions') && !this.config.get('case.caseSensitive'))
-			return s.toLowerCase();
+			return ' '.repeat(pad) + s.toLowerCase();
 		else
-			return s.toUpperCase();
+			return ' '.repeat(pad) + s.toUpperCase();
 	}
 	add_label(ans: Array<vscode.CompletionItem>,a2tok: Set<string>)
 	{
@@ -141,7 +162,7 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 		{
 			const it = { 
 				description: "",
-				label: this.modify(s)
+				label: this.modify(s,0)
 			};
 			if (Object(opcodes)[s])
 				it.description = Object(opcodes)[s].brief;
@@ -150,11 +171,12 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 			ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.Keyword));
 		});
 	}
-	add_args(ans: Array<vscode.CompletionItem>,op: string)
+	add_args(ans: Array<vscode.CompletionItem>,op: string,pos: vscode.Position)
 	{
 		const req = ['6502','65c02','65c816'][this.xcCount];
 		const psopInfo = Object(pseudo)[op.toLowerCase()];
 		const opInfo = Object(opcodes)[op.toLowerCase()];
+		const stop2 = this.widths[0] + this.widths[1];
 		if (opInfo)
 		{
 			const modeList = opInfo.modes;
@@ -164,11 +186,11 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 				if (mode.processors.includes(req) && snip && snip.length>0)
 				{
 					const it = { 
-						description: this.modify(op) + " args",
-						label: this.modify(mode.addr_mnemonic)
+						description: this.modify(op,0) + " args",
+						label: this.modify(mode.addr_mnemonic,0)
 					};
 					ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.Value));
-					ans[ans.length-1].insertText = new vscode.SnippetString(this.modify(snip));
+					ans[ans.length-1].insertText = new vscode.SnippetString(this.modify(snip,stop2-pos.character));
 				}
 			}
 		}
@@ -189,10 +211,11 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 						if (!unsupported)
 						{
 							const it = { 
-								description: this.modify(op) + " args",
-								label: this.modify(s)
+								description: this.modify(op,0) + " args",
+								label: this.modify(s,0)
 							};
-							ans.push(new vscode.CompletionItem(it,vscode.CompletionItemKind.EnumMember));
+							ans.push(new vscode.CompletionItem(it, vscode.CompletionItemKind.EnumMember));
+							ans[ans.length - 1].insertText = new vscode.SnippetString(this.modify(s, this.widths[1] - op.length - 1));
 						}
 					}
 				});
@@ -247,22 +270,22 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 			for (const k of Object.keys(pseudo))
 				if (this.pseudoOpEnabled(Object(pseudo)[k].version))
 					simple.push(k);
-			for (const [k,v] of sharedLabels.macros)
+			for (const [k,v] of this.labelSentry.shared.macros)
 				label.add(k);
 		}
 		if (linePrefix.search(/^:$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+:$/)>-1) // pressed `:` in first or third column
 		{
-			for (const [k,v] of sharedLabels.locals)
+			for (const [k,v] of this.labelSentry.shared.locals)
 				label.add(k.substring(k.indexOf('\u0100')+1));
 		}
 		if (linePrefix.search(/^]$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+]$/)>-1) // pressed `]` in first or third column
 		{
-			for (const [k,v] of sharedLabels.vars)
+			for (const [k,v] of this.labelSentry.shared.vars)
 				label.add(k);
 		}
 		if (linePrefix.search(/^[a-zA-Z]$/)>-1 || linePrefix.search(/^\S*\s+\S+\s+[a-zA-Z]$/)>-1) // pressed alpha in first or third column
 		{
-			for (const [k,v] of sharedLabels.globals)
+			for (const [k,v] of this.labelSentry.shared.globals)
 				label.add(k);
 		}
 		if (linePrefix.search(/^\S*\s+\S+\s+$/)>-1) // search for (pseudo)-instruction args upon space
@@ -270,7 +293,7 @@ export class TSCompletionProvider extends lxbase.LangExtBase implements vscode.C
 			const match = linePrefix.match(/^\S*\s+(\S+)/);
 			if (match)
 			{
-				this.add_args(ans,match[1]);
+				this.add_args(ans,match[1],position);
 			}
 		}
 		this.add_simple(ans,simple);

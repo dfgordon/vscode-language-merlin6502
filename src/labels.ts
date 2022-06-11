@@ -49,10 +49,11 @@ export class LabelSet
 	entries = new Map<string,Array<LabelNode>>();
 }
 
-export class LabelSentry extends LangExtBase implements vscode.DeclarationProvider, vscode.DocumentSymbolProvider
+export class LabelSentry extends LangExtBase implements vscode.DeclarationProvider, vscode.DocumentSymbolProvider, vscode.ReferenceProvider
 {
 	diag = new Array<vscode.Diagnostic>();
 	labels = new LabelSet();
+	shared = new LabelSet();
 	running = new Set<string>();
 	inMacro = false;
 	currScope = '';
@@ -60,6 +61,8 @@ export class LabelSentry extends LangExtBase implements vscode.DeclarationProvid
 	enclosingRng = new vscode.Range(0,0,0,0);
 	typ : SourceType = SourceOptions.master;
 	currDoc : vscode.TextDocument | null = null;
+	currNode : Parser.SyntaxNode | null = null;
+	refResult : vscode.Location[] = [];
 	async prepare_externals(docs: vscode.Uri[])
 	{
 		this.docs = new Array<vscode.TextDocument>();
@@ -334,11 +337,11 @@ export class LabelSentry extends LangExtBase implements vscode.DeclarationProvid
 	public provideDeclaration(document: vscode.TextDocument, position: vscode.Position): vscode.ProviderResult<vscode.Declaration> 
 	{
 		const ans : vscode.Location[] = [];
-		const refNode = this.GetNodeAtPosition(document,position,this.labels.macros);
+		const refNode = this.GetNodeAtPosition(document,position,this.shared.macros);
 		if (!refNode)
 			return ans;
-		this.AddDeclarations(ans,document,refNode.text,this.labels.globals);
-		this.AddDeclarations(ans,document,refNode.text,this.labels.macros);
+		this.AddDeclarations(ans,document,refNode.text,this.shared.globals);
+		this.AddDeclarations(ans,document,refNode.text,this.shared.macros);
 		return ans;
 	}
 	AddSymbols(sym: vscode.DocumentSymbol[],doc: vscode.TextDocument,typ: string,decs: Map<string,Array<LabelNode>>)
@@ -357,8 +360,30 @@ export class LabelSentry extends LangExtBase implements vscode.DeclarationProvid
 	public provideDocumentSymbols(document: vscode.TextDocument): vscode.ProviderResult<vscode.DocumentSymbol[]>
 	{
 		const sym : vscode.DocumentSymbol[] = [];
-		this.AddSymbols(sym,document,'global',this.labels.globals);
-		this.AddSymbols(sym,document,'macro',this.labels.macros);
+		this.AddSymbols(sym,document,'global',this.shared.globals);
+		this.AddSymbols(sym,document,'macro',this.shared.macros);
 		return sym;
+	}
+	visit_refs(curs: Parser.TreeCursor) : WalkerChoice
+	{
+		if (this.currNode && curs.nodeType=="label_ref" && curs.nodeText==this.currNode.text && this.currDoc)
+		{
+			this.refResult.push(new vscode.Location(this.currDoc.uri,this.curs_to_range(curs,this.row,this.col)));
+			return WalkerOptions.gotoSibling;
+		}
+		return WalkerOptions.gotoChild;
+	}
+	public provideReferences(document: vscode.TextDocument, position: vscode.Position): vscode.ProviderResult<vscode.Location[]> {
+		this.refResult = [];
+		this.currDoc = document;
+		this.currNode = this.GetNodeAtPosition(document,position,this.shared.macros);
+		if (!this.currNode)
+			return;
+		for (this.row=0;this.row<document.lineCount;this.row++)
+		{
+			const tree = this.parse(this.AdjustLine(document,this.shared.macros),"\n");
+			this.walk(tree,this.visit_refs.bind(this));
+		}
+		return this.refResult;
 	}
 }

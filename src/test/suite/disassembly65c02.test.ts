@@ -1,5 +1,4 @@
 import * as lxbase from '../../langExtBase';
-import * as labels from '../../labels';
 import * as com from '../../commands';
 import * as assert from 'assert';
 

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import Parser from 'web-tree-sitter';
-import { sharedLabels } from './extension';
+import * as labels from './labels';
 import * as lxbase from './langExtBase';
 
 const tokenTypes = [
@@ -17,7 +17,13 @@ export const legend = new vscode.SemanticTokensLegend(tokenTypes,tokenModifiers)
 
 class SemanticTokensBase extends lxbase.LangExtBase
 {
+	labelSentry: labels.LabelSentry;
 	tokensBuilder : vscode.SemanticTokensBuilder = new vscode.SemanticTokensBuilder(legend);
+	constructor(TSInitResult: [Parser, Parser.Language], sentry: labels.LabelSentry)
+	{
+		super(TSInitResult);
+		this.labelSentry = sentry;
+	}
 
 	process_node(curs: Parser.TreeCursor): lxbase.WalkerChoice
 	{
@@ -96,7 +102,7 @@ export class RangeTokensProvider extends SemanticTokensBase implements vscode.Do
 			return null;
 		for (this.row=range.start.line;this.row<range.end.line;this.row++)
 		{
-			const tree = this.parse(this.AdjustLine(document,sharedLabels.macros),"\n");
+			const tree = this.parse(this.AdjustLine(document,this.labelSentry.shared.macros),"\n");
 			this.walk(tree,this.process_node.bind(this));
 		}
 		return this.tokensBuilder.build();
@@ -113,7 +119,7 @@ export class DocTokensProvider extends SemanticTokensBase implements vscode.Docu
 			return null;
 		for (this.row=0;this.row<document.lineCount;this.row++)
 		{
-			const tree = this.parse(this.AdjustLine(document,sharedLabels.macros),"\n");
+			const tree = this.parse(this.AdjustLine(document,this.labelSentry.shared.macros),"\n");
 			this.walk(tree,this.process_node.bind(this));
 		}
 		return this.tokensBuilder.build();

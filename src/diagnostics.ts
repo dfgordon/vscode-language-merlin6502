@@ -65,25 +65,14 @@ class ProcessorModeSentry
 		}
 		if (this.xcCount==2) // all modes are valid so exit now
 			return;
-		const req = this.xcCount==0 ? '6502' : '65c02';
+		const req = this.xcCount == 0 ? '6502' : '65c02';
+		// no need to check for disabled instructions since it will be a macro and flagged here
 		if (curr.type=='label_ref' && curs.currentFieldName()=='mac')
 		{
 			const opInfo= this.ops[curr.text.toLowerCase()]?.processors;
 			if (opInfo && !opInfo.includes(req))
-			{
 				diag.push(new vscode.Diagnostic(rng,'macro name matches a disabled instruction',vscode.DiagnosticSeverity.Information));
-				return;
-			}
-		}
-		if (curr.type.substring(0,3)=='op_')
-		{
-			const opInfo = this.ops[curr.text.substring(0,3).toLowerCase()]?.processors;
-			if (opInfo && !opInfo.includes(req))
-			{
-				// should never get here
-				diag.push(new vscode.Diagnostic(rng,'operation disabled, use XC pseudo-op to enable',vscode.DiagnosticSeverity.Error));
-				return;
-			}
+			return;
 		}
 		const availModes = this.modeMap[curr.type];
 		if (availModes && prev && prev.type.substring(0,3)=='op_')
@@ -119,31 +108,50 @@ class PseudoOpSentry
 		const curr = curs.currentNode();
 		const prev = curr.previousSibling;
 
-		if (curr.type=="label_def")
+		// ordering of conditionals is supposed to promote efficiency
+
+		if (curr.type == "label_def")
 			this.defFound = true;
-		if (curr.type=="operation")
+		else if (curr.type=="operation")
 			this.opFound = true;
-		if (curr.type=="psop_org")
-			this.orgFound = true;
-		if (curr.type=="psop_rel")
-			this.relFound = true;
-		if (curr.type=="psop_obj" && this.opFound)
-			diag.push(new vscode.Diagnostic(rng,'OBJ should not appear after start of code'));
-		if (curr.type=="psop_rel" && this.orgFound || curr.type=="psop_org" && this.relFound)
-			diag.push(new vscode.Diagnostic(rng,'REL and ORG should not appear in the same file'));
-		if (curr.type=="psop_rel" && this.defFound)
-			diag.push(new vscode.Diagnostic(rng,'REL appears after one or more label definitions'));
-		if (curr.type=="psop_ext" || curr.type=="psop_exd" || curr.type=="psop_ent")
+		else if (curr.type.substring(0, 5) == 'psop_')
 		{
-			const operand = curr.nextNamedSibling && curr.nextNamedSibling.type!="comment";
-			if (prev && operand)
-				diag.push(new vscode.Diagnostic(rng,'use either column 1 or 3 for the label(s), not both',vscode.DiagnosticSeverity.Error));
-			if (!prev && !operand)
-				diag.push(new vscode.Diagnostic(rng,'must provide label(s) in either column 1 or 3',vscode.DiagnosticSeverity.Error));
+			const abv = curr.type.substring(5);
+			if (abv == "equ")
+			{
+				if (!prev)
+					diag.push(new vscode.Diagnostic(rng, 'must provide label', vscode.DiagnosticSeverity.Error));
+			}
+			else if (abv == "org")
+			{
+				if (this.relFound)
+					diag.push(new vscode.Diagnostic(rng,'REL and ORG should not appear in the same file'));
+				this.orgFound = true;
+			}
+			else if (abv == "rel")
+			{
+				if (this.orgFound)
+					diag.push(new vscode.Diagnostic(rng,'REL and ORG should not appear in the same file'));
+				if (this.defFound)
+					diag.push(new vscode.Diagnostic(rng,'REL appears after one or more label definitions'));			
+				this.relFound = true;
+			}
+			else if (abv == "obj")
+			{
+				if (this.opFound)
+					diag.push(new vscode.Diagnostic(rng, 'OBJ should not appear after start of code'));
+			}
+			else if (abv=="ext" || abv=="exd" || abv=="ent")
+			{
+				const operand = curr.nextNamedSibling && curr.nextNamedSibling.type!="comment";
+				if (prev && operand)
+					diag.push(new vscode.Diagnostic(rng,'use either column 1 or 3 for the label(s), not both',vscode.DiagnosticSeverity.Error));
+				if (!prev && !operand)
+					diag.push(new vscode.Diagnostic(rng,'must provide label(s) in either column 1 or 3',vscode.DiagnosticSeverity.Error));
+			}
+			// no need to check for disabled pseudo-op since it will be interpreted as a macro and flagged below
 		}
-		if (curr.type=="psop_equ" && !prev)
-			diag.push(new vscode.Diagnostic(rng,'must provide label',vscode.DiagnosticSeverity.Error));
-		if (curr.type=='label_ref' && curs.currentFieldName()=='mac')
+		else if (curr.type=='label_ref' && curs.currentFieldName()=='mac')
 		{
 			const psopInfo = this.psops[curr.text.toLowerCase()]?.version;
 			if (psopInfo && !psopInfo.includes(this.merlinVersion))
@@ -152,17 +160,8 @@ class PseudoOpSentry
 				return;
 			}
 		}
-		if (curr.type.substring(0,5)=='psop_')
-		{
-			const psopInfo = this.psops[curr.text.toLowerCase()]?.version;
-			if (psopInfo && !psopInfo.includes(this.merlinVersion))
-			{
-				// should never get here
-				diag.push(new vscode.Diagnostic(rng,'pseudo-op is disabled for the selected Merlin version',vscode.DiagnosticSeverity.Error));
-				return;
-			}
-		}
-		if (prev && prev.type.substring(0,5)=='psop_')
+
+		if (prev && prev.type.substring(0, 5) == 'psop_')
 		{
 			const psopInfo = this.psops[prev.text.toLowerCase()];
 			if (this.merlinVersion=='v8' && psopInfo?.v8x)
@@ -335,6 +334,7 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 			{
 				// the labelSentry carries out its own passes through the tree
 				this.labelSentry.build_main(document);
+				this.labelSentry.shared = this.labelSentry.labels;
 				this.labelSentry.verify_main(document);
 				this.diag = this.labelSentry.diag;
 				// other sentries merely provide visit functions for the final pass
@@ -350,6 +350,7 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 			else
 			{
 				this.labelSentry.labels = new labels.LabelSet();
+				this.labelSentry.shared = this.labelSentry.labels;
 			}
 			versionIndicator.show();
 			typeIndicator.show();

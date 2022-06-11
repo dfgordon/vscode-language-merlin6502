@@ -7,15 +7,16 @@ import * as assert from 'assert';
 describe('Commands: format', async function() {
 	this.beforeEach(async function() {
 		const TSInitResult = await lxbase.TreeSitterInit();
-		this.disTool = new com.DisassemblyTool(TSInitResult);
+		this.labelSentry = new labels.LabelSentry(TSInitResult);
+		this.fmtTool = new com.FormattingTool(TSInitResult,this.labelSentry);
 	});
 	it('straight code', async function() {
         const testCode = '   LDA \t #$00\n\tBEQ\t10';
         const expectedCode = ' LDA #$00\n BEQ 10\n';
 		const doc = await vscode.workspace.openTextDocument({content:testCode,language:'merlin6502'});
 		await vscode.window.showTextDocument(doc);
-        await this.disTool.showPasteableProgram();
-        assert.strictEqual(this.disTool.formattedCode,expectedCode);
+        await this.fmtTool.showPasteableProgram();
+        assert.strictEqual(this.fmtTool.formattedCode,expectedCode);
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});
@@ -24,8 +25,8 @@ describe('Commands: format', async function() {
         const expectedCode = '** spaces     spaces **\n LDA #$00\n BEQ 10 ;   spaces\n';
 		const doc = await vscode.workspace.openTextDocument({content:testCode,language:'merlin6502'});
 		await vscode.window.showTextDocument(doc);
-        await this.disTool.showPasteableProgram();
-        assert.strictEqual(this.disTool.formattedCode,expectedCode);
+        await this.fmtTool.showPasteableProgram();
+        assert.strictEqual(this.fmtTool.formattedCode,expectedCode);
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});
@@ -34,8 +35,8 @@ describe('Commands: format', async function() {
         const expectedCode = ' LDA #$00\n ASC "spaces   spaces"\n';
 		const doc = await vscode.workspace.openTextDocument({content:testCode,language:'merlin6502'});
 		await vscode.window.showTextDocument(doc);
-        await this.disTool.showPasteableProgram();
-        assert.strictEqual(this.disTool.formattedCode,expectedCode);
+        await this.fmtTool.showPasteableProgram();
+        assert.strictEqual(this.fmtTool.formattedCode,expectedCode);
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});
@@ -44,8 +45,8 @@ describe('Commands: format', async function() {
         const expectedCode = '* *\n LDA #$00\n'; // tab runs in comments are also reduced to a space
 		const doc = await vscode.workspace.openTextDocument({content:testCode,language:'merlin6502'});
 		await vscode.window.showTextDocument(doc);
-        await this.disTool.showPasteableProgram();
-        assert.strictEqual(this.disTool.formattedCode,expectedCode);
+        await this.fmtTool.showPasteableProgram();
+        assert.strictEqual(this.fmtTool.formattedCode,expectedCode);
 		while (vscode.window.activeTextEditor)
 			await vscode.commands.executeCommand("workbench.action.closeActiveEditor", vscode.window.activeTextEditor.document.uri);
 	});

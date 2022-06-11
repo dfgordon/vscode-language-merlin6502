@@ -4,6 +4,8 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
+*latest features*: live diagnostics optional, format as you type, goto references
+
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
 * Comprehensive highlights, completions, and hovers
@@ -30,9 +32,13 @@ There are a few syntax rules that are *always* enforced by the extension, and wh
 
 ## About Columns and Case
 
-Assembly language is organized into lines and columns.  Merlin source files use a single space as the column separator, even though the Merlin editor displays columns at tab stops.  This extension will accept any combination of spaces and tabs as the column separator.  Setting the indentation (`Ctrl+P` -> `Indent Using ...`) to 8 is a fair choice if you want to use tabs for column positioning.  There is a setting for variable column widths, along with an associated command `Ctrl+P` -> `merlin6502: Resize columns`.  This will be applied to the current selection, or the whole document if the selection is empty.
+Assembly language is organized into lines and columns.  Merlin source files use a single space as the column separator, even though the Merlin editor displays columns at tab stops.  This extension will accept any combination of spaces and tabs as the column separator.  The use of flexible column separators means that if some columns are empty, context-free counting of columns is not possible.  In practice, all you have to keep in mind is that comments must appear *last*, rather than in a particular column.  Formatting columns can be done in three ways:
 
-The use of flexible column separators means that if some columns are empty, context-free counting of columns is not possible.  In practice, all you have to keep in mind is that comments must appear *last*, rather than in a particular column.
+* **on tab**: Setting the indentation (`Ctrl+P` -> `Indent Using ...`) to 8 is a fair choice if you want to use tabs for column positioning.
+
+* **on space**: If you activate `Text Editor` -> `Formatting` -> `Format On Type`, then upon typing a space, the extension will advance the cursor to the variable tab stops that are defined in extension settings.  If there is an operand completion, it will be shifted after it is accepted.  Note the formatting in this mode only works in the forward direction.
+
+* **on command**: Using `Format Document` or `Format Selection`, will apply the variable column widths defined in extension settings.
 
 Merlin labels are case sensitive, while instruction and pseudo-instruction mnemonics are not.  There are settings to control the behavior of completions and diagnostics with respect to case.  When pasting code into Merlin, auto-capitalization settings within Merlin may take effect.
 
@@ -42,7 +48,7 @@ The extension knows hundreds of special address locations relevant to Integer BA
 
 ## Operand Completions
 
-If you want to be offered completions for available addressing modes or certain pseudo-op arguments, press space after accepting the completion in the instruction column.  Select the operand you want, and tab your way through the resulting snippet in the usual VS Code fashion.  You can use `merlin6502: Resize columns` periodically to move completed operands to the tab stop.
+If you want to be offered completions for available addressing modes or certain pseudo-op arguments, press space after accepting the completion in the instruction column.  Select the operand you want, and tab your way through the resulting snippet in the usual VS Code fashion.  You can use `Format Document` periodically to move completed operands to the tab stop, if `Format On Type` is not activated.
 
 If you do *not* want to be troubled by operand completions, press tab instead of space, after accepting the instruction.
 
@@ -75,7 +81,7 @@ In the spirit of the original Merlin, we rely on the `XC` pseudo-operation to en
     - `XC OFF` sets target = 6502
     - `XC OFF` followed by `XC` sets target = 65C02
 
-However, note that `XC OFF` was not introduced until Merlin 16+.
+However, note that `XC OFF` was not introduced until Merlin 16+.  The Merlin 32 assembler appears to ignore `XC`, but you can still use it in the extension for diagnostic purposes.
 
 ## Using with AppleWin
 
@@ -120,8 +126,9 @@ This capability only applies to MacOS. Note that [Virtual \]\[](https://virtuali
 * VS Code
     - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
     - tab your way to the end of snippets
-    - to mitigate diagnostic delay, break large source files into smaller modules
-    - diagnostic updates are forced by new line, or saving the document
+    - to mitigate diagnostic delay, break large source files into smaller modules, or turn off live diagnostics in settings
+    - diagnostic updates are forced by new line (live), or saving the document (always)
+    - if symbol information doesn't load try forcing a diagnostic update
 * Disassembly
     - verify that the starting address is aligned with an instruction opcode
     - stop disassembly before start of data
