@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest features*: live diagnostics optional, format as you type, goto references
+*latest features*: rename symbol, live diagnostics optional, format as you type, goto references
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace

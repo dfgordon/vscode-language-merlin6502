@@ -49,7 +49,8 @@ export class LabelSet
 	entries = new Map<string,Array<LabelNode>>();
 }
 
-export class LabelSentry extends LangExtBase implements vscode.DeclarationProvider, vscode.DocumentSymbolProvider, vscode.ReferenceProvider
+export class LabelSentry extends LangExtBase implements
+	vscode.DeclarationProvider, vscode.DocumentSymbolProvider, vscode.ReferenceProvider, vscode.RenameProvider
 {
 	diag = new Array<vscode.Diagnostic>();
 	labels = new LabelSet();
@@ -62,7 +63,9 @@ export class LabelSentry extends LangExtBase implements vscode.DeclarationProvid
 	typ : SourceType = SourceOptions.master;
 	currDoc : vscode.TextDocument | null = null;
 	currNode : Parser.SyntaxNode | null = null;
-	refResult : vscode.Location[] = [];
+	refResult: vscode.Location[] = [];
+	renResult: vscode.WorkspaceEdit = new vscode.WorkspaceEdit();
+	replacementText: string = '';
 	async prepare_externals(docs: vscode.Uri[])
 	{
 		this.docs = new Array<vscode.TextDocument>();
@@ -385,5 +388,28 @@ export class LabelSentry extends LangExtBase implements vscode.DeclarationProvid
 			this.walk(tree,this.visit_refs.bind(this));
 		}
 		return this.refResult;
+	}
+	visit_rename(curs: Parser.TreeCursor): WalkerChoice
+	{
+		if (this.currDoc && this.currNode && this.currNode.type == curs.nodeType && this.currNode.text == curs.nodeText)
+		{
+			this.renResult.replace(this.currDoc.uri, this.curs_to_range(curs, this.row, this.col), this.replacementText);
+			return WalkerOptions.gotoSibling;
+		}
+		return WalkerOptions.gotoChild;
+	}
+	public provideRenameEdits(document: vscode.TextDocument, position: vscode.Position, newName: string): vscode.ProviderResult<vscode.WorkspaceEdit> {
+		this.renResult = new vscode.WorkspaceEdit();
+		this.currDoc = document;
+		this.replacementText = newName;
+		this.currNode = this.GetNodeAtPosition(document, position, this.shared.macros);
+		if (!this.currNode)
+			return;
+		for (this.row=0;this.row<document.lineCount;this.row++)
+		{
+			const tree = this.parse(this.AdjustLine(document,this.shared.macros),"\n");
+			this.walk(tree,this.visit_rename.bind(this));
+		}
+		return this.renResult;
 	}
 }

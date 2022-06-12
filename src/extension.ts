@@ -59,6 +59,7 @@ export function activate(context: vscode.ExtensionContext)
 		const decDisposable = vscode.languages.registerDeclarationProvider(selector,labelSentry);
 		let docSymDisposable = vscode.languages.registerDocumentSymbolProvider(selector,labelSentry);
 		const refDisposable = vscode.languages.registerReferenceProvider(selector,labelSentry);
+		const renDisposable = vscode.languages.registerRenameProvider(selector,labelSentry);
 		const editDisposable = vscode.languages.registerOnTypeFormattingEditProvider(selector,formatter,' ',';');
 		const rngDisposable = vscode.languages.registerDocumentRangeFormattingEditProvider(selector, formatter);
 		
@@ -70,6 +71,7 @@ export function activate(context: vscode.ExtensionContext)
 		context.subscriptions.push(decDisposable);
 		context.subscriptions.push(docSymDisposable);
 		context.subscriptions.push(refDisposable);
+		context.subscriptions.push(renDisposable);
 		context.subscriptions.push(editDisposable);
 		context.subscriptions.push(rngDisposable);
 
