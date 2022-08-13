@@ -3,7 +3,7 @@
 	"displayName": "Merlin 6502",
 	"description": "Merlin assembly language for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
-	"version": "0.5.2",
+	"version": "1.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -11,7 +11,7 @@
 		"url": "https://github.com/dfgordon/vscode-language-merlin6502"
 	},
 	"engines": {
-		"vscode": "^1.56.0"
+		"vscode": "^1.63.0"
 	},
 	"categories": [
 		"Programming Languages"
@@ -23,7 +23,7 @@
 		"onCommand:merlin6502.getFrontVii",
 		"onCommand:merlin6502.getAppleWinSaveState"
 	],
-	"main": "./out/extension.js",
+	"main": "./client/out/extension.js",
 	"contributes": {
 		"configuration": {
 			"title": "Merlin 6502",
@@ -107,6 +107,14 @@
 					"type": "boolean",
 					"default": true,
 					"markdownDescription": "Update diagnostics on any document change.  If not, then only update on save document.  If you are editing large files it may be helpful to uncheck this."
+				},
+				"merlin6502.trace.server": {
+					"enum": [
+						"verbose",
+						"silent"
+					],
+					"default": "silent",
+					"markdownDescription": "Logging level for client/server messages"
 				}
 			}
 		},
@@ -165,15 +173,19 @@
 		"yaml": "^2.0.1"
 	},
 	"scripts": {
-		"reset": "run-script-os",
-		"reset:windows": "npx rimraf out && mkdir out && copy src\\*.wasm out && copy src\\*.scpt out",
-		"reset:default": "npx rimraf out && mkdir out && cp src/*.wasm out && cp src/*.scpt out",
-		"vscode:prepublish": "npm run esbuild-base -- --minify",
-		"esbuild-base": "npm run reset && esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
-		"build": "npm run esbuild-base -- --sourcemap",
+		"reset-client": "run-script-os",
+		"reset-server": "run-script-os",
+		"reset-client:windows": "npx rimraf client\\out && mkdir client\\out && copy client\\src\\*.scpt client\\out",
+		"reset-client:default": "npx rimraf client/out && mkdir client/out && cp client/src/*.scpt client/out",
+		"reset-server:windows": "npx rimraf server\\out && mkdir server\\out && copy server\\src\\*.wasm server\\out",
+		"reset-server:default": "npx rimraf server/out && mkdir server/out && cp server/src/*.wasm server/out",
+		"vscode:prepublish": "npm run esbuild-client -- --minify && npm run esbuild-server -- --minify",
+		"esbuild-client": "npm run reset-client && esbuild ./client/src/extension.ts --bundle --outfile=client/out/extension.js --external:vscode --format=cjs --platform=node",
+		"esbuild-server": "npm run reset-server && esbuild ./server/src/server.ts --bundle --outfile=server/out/server.js --external:vscode --format=cjs --platform=node",
+		"build": "npm run esbuild-client -- --sourcemap && npm run esbuild-server -- --sourcemap",
 		"lint": "eslint . --ext .ts,.tsx",
-		"test-compile": "npm run reset && tsc -p ./",
-		"test": "node ./out/test/runTest.js"
+		"test-compile": "npm run reset-client && tsc -p ./client/ && npm run reset-server && tsc -p ./server/",
+		"test": "node ./server/out/test/runTest.js && node ./client/out/test/runTest.js"
 	},
 	"devDependencies": {
 		"@types/glob": "^7.2.0",

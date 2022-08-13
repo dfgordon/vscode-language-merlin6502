@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest features*: rename symbol, live diagnostics optional, format as you type, goto references
+*latest features*: LSP implementation, simplified operand completions
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
@@ -32,25 +32,23 @@ There are a few syntax rules that are *always* enforced by the extension, and wh
 
 ## About Columns and Case
 
-Assembly language is organized into lines and columns.  Merlin source files use a single space as the column separator, even though the Merlin editor displays columns at tab stops.  This extension will accept any combination of spaces and tabs as the column separator.  The use of flexible column separators means that if some columns are empty, context-free counting of columns is not possible.  In practice, all you have to keep in mind is that comments must appear *last*, rather than in a particular column.  Formatting columns can be done in three ways:
+Assembly language is organized into lines and columns.  Merlin source files use a single space as the column separator, even though the Merlin editor displays columns at tab stops.  This extension will accept any combination of spaces and tabs as the column separator.  The use of flexible column separators means that if some columns are empty, context-free counting of columns is not possible.  Since the parser understands context this causes no trouble.  Formatting columns can be done in three ways:
 
 * **on tab**: Setting the indentation (`Ctrl+P` -> `Indent Using ...`) to 8 is a fair choice if you want to use tabs for column positioning.
 
-* **on space**: If you activate `Text Editor` -> `Formatting` -> `Format On Type`, then upon typing a space, the extension will advance the cursor to the variable tab stops that are defined in extension settings.  If there is an operand completion, it will be shifted after it is accepted.  Note the formatting in this mode only works in the forward direction.
+* **on space**: If you activate `Text Editor` -> `Formatting` -> `Format On Type`, then upon typing a space, the extension will advance the cursor to the variable tab stops that are defined in extension settings.  Note the formatting in this mode only works in the forward direction.
 
 * **on command**: Using `Format Document` or `Format Selection`, will apply the variable column widths defined in extension settings.
 
 Merlin labels are case sensitive, while instruction and pseudo-instruction mnemonics are not.  There are settings to control the behavior of completions and diagnostics with respect to case.  When pasting code into Merlin, auto-capitalization settings within Merlin may take effect.
 
+## Working with Labels
+
+You can use `Go to Declaration`, `Go to Definition`, `Go to References`, and `Rename Symbol` to find and manipulate labels.  You can also jump to labels using `Ctrl+O` (symbol in document), or `Ctrl+t` (entry labels throughout workspace).  Renaming is scoped to a document and its `PUT` and `USE` includes. 
+
 ## Apple ][ Special Addresses
 
 The extension knows hundreds of special address locations relevant to Integer BASIC, Applesoft, DOS 3.3, ProDOS, and the Apple ][ ROM.  Hovering over a literal address will display information about any address in the database.  Completions for special addresses are triggered when `$` is entered in the operand column following `EQU` or `=`.
-
-## Operand Completions
-
-If you want to be offered completions for available addressing modes or certain pseudo-op arguments, press space after accepting the completion in the instruction column.  Select the operand you want, and tab your way through the resulting snippet in the usual VS Code fashion.  You can use `Format Document` periodically to move completed operands to the tab stop, if `Format On Type` is not activated.
-
-If you do *not* want to be troubled by operand completions, press tab instead of space, after accepting the instruction.
 
 ## Linker Command Files
 
@@ -126,8 +124,7 @@ This capability only applies to MacOS. Note that [Virtual \]\[](https://virtuali
 * VS Code
     - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
     - tab your way to the end of snippets
-    - to mitigate diagnostic delay, break large source files into smaller modules, or turn off live diagnostics in settings
-    - diagnostic updates are forced by new line (live), or saving the document (always)
+    - to mitigate diagnostic delay, break large source files into smaller modules
     - if symbol information doesn't load try forcing a diagnostic update
 * Disassembly
     - verify that the starting address is aligned with an instruction opcode

@@ -1,0 +1,25 @@
+{
+	"name": "vscode-language-merlin6502-server",
+	"description": "Language server for Merlin assembly language",
+	"version": "1.0.0",
+	"license": "GPL-3.0-only",
+	"publisher": "dfgordon",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/dfgordon/vscode-language-applesoft"
+	},
+	"engines": {
+		"node": "*"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"dependencies": {
+		"vscode-languageserver": "^8.0.0",
+		"vscode-languageserver-textdocument": "^1.0.4",
+		"vscode-uri": "^3.0.3",
+		"web-tree-sitter": "^0.20.3",
+		"yaml": "^2.0.1"
+	},
+	"scripts": {}
+}
