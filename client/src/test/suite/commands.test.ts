@@ -8,12 +8,9 @@ async function testFormat(progName: string, expectedCode: string) {
 	const progPath = path.resolve(__dirname, '..', '..', '..', '..', 'sample', 'test', progName);
 	const doc = await vscode.workspace.openTextDocument(progPath);
 	const ed = await vscode.window.showTextDocument(doc);
+	vscode.languages.setTextDocumentLanguage(doc, 'merlin6502');
 	if (!ed)
 		assert.fail('no active text editor');
-	let collections: [vscode.Uri,vscode.Diagnostic[]][];
-	do {
-		collections = vscode.languages.getDiagnostics();
-	} while (!collections);
 	const actualCode = await vscode.commands.executeCommand("merlin6502.format");
 	assert.strictEqual(actualCode,expectedCode);
 }

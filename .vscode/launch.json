@@ -31,7 +31,7 @@
 			"args": [
 				"--extensionDevelopmentPath=${workspaceRoot}",
 				"--extensionTestsPath=${workspaceRoot}/client/out/test/suite/index",
-				"${workspaceRoot}/sample"
+				"${workspaceRoot}/sample/test"
 			],
 			"outFiles": ["${workspaceRoot}/client/out/test/**/*.js"],
 			"preLaunchTask": "npm: test-compile"

@@ -101,9 +101,9 @@ export class TokenProvider extends lxbase.LangExtBase
 
 	provideDocumentRangeSemanticTokens(document:vsdoc.TextDocument,range: vsserv.Range): vsserv.SemanticTokens | null
 	{
-		const macros = this.labelSentry.shared.get(document.uri)?.macros;
+		let macros = this.labelSentry.shared.get(document.uri)?.macros;
 		if (!macros)
-			return null;
+			macros = new Map<string,labels.LabelNode[]>();
 		const lines = document.getText().split('\n');
 		this.tokensBuilder = new vsserv.SemanticTokensBuilder();
 		this.GetProperties(lines);
@@ -119,9 +119,9 @@ export class TokenProvider extends lxbase.LangExtBase
 
 	provideDocumentSemanticTokens(document:vsdoc.TextDocument): vsserv.SemanticTokens | null
 	{
-		const macros = this.labelSentry.shared.get(document.uri)?.macros;
+		let macros = this.labelSentry.shared.get(document.uri)?.macros;
 		if (!macros)
-			return null;
+			macros = new Map<string,labels.LabelNode[]>();
 		const lines = document.getText().split('\n');
 		this.tokensBuilder = new vsserv.SemanticTokensBuilder();
 		this.GetProperties(lines);

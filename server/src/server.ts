@@ -76,7 +76,7 @@ connection.onInitialize((params: vsserv.InitializeParams) => {
 				resolveProvider: false,
 				triggerCharacters: ['$',':',']','(','[',',']
 			},
-			semanticTokensProvider: { range: true, documentSelector: ['merlin6502'], legend: tok.legend },
+			semanticTokensProvider: { range: true, full: true, documentSelector: ['merlin6502'], legend: tok.legend },
 			declarationProvider: true,
 			definitionProvider: true,
 			referencesProvider: true,
@@ -233,7 +233,8 @@ connection.onWorkspaceSymbol(() => {
 	return workspaceSymbolFromMap(labels.entries, vsserv.SymbolKind.Constant);
 });
 
-connection.onDocumentSymbol(params => {
+connection.onDocumentSymbol(async params => {
+	await waitForInit();
 	const uri = params.textDocument.uri;
 	let ans = new Array<vsserv.DocumentSymbol>();
 	const labelSet = labels.shared.get(uri);
@@ -331,12 +332,19 @@ connection.onCompletion((params: vsserv.CompletionParams): vsserv.CompletionItem
 
 // Commands and Formatting
 
-connection.onExecuteCommand((params: vsserv.ExecuteCommandParams): any => {
+connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise<any> => {
+	await waitForInit();
 	if (params.command == 'merlin6502.pasteFormat') {
 		if (params.arguments) {
 			const lines : string[] = params.arguments[0];
 			const uri: string = params.arguments[1];
-			const labelSet = labels.shared.get(uri);
+			let labelSet = labels.shared.get(uri);
+			let tries = 0;
+			while (!labelSet && tries<20) {
+				await new Promise(resolve => setTimeout(resolve, 50));
+				labelSet = labels.shared.get(uri);
+				tries += 1;
+			}
 			if (!labelSet)
 				return '* could not find document symbols';
 			return formatter.formatForMerlin(lines,labelSet.macros);
@@ -372,10 +380,10 @@ connection.onDocumentOnTypeFormatting((params: vsserv.DocumentOnTypeFormattingPa
 
 async function waitForInit() {
 	while (!diagnosticTool || !labels)
-		await new Promise(resolve => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 50));
 }
 
-async function getAllWorkspaceDocs() : Promise<Array<vsserv.WorkspaceFolder> | null> {
+async function getAllWorkspaceDocs() {
 	const folders = await connection.workspace.getWorkspaceFolders();
 	if (folders) {
 		workspaceDocs = new Array<vsserv.TextDocumentItem>();
@@ -388,8 +396,10 @@ async function getAllWorkspaceDocs() : Promise<Array<vsserv.WorkspaceFolder> | n
 				workspaceDocs.push(vsserv.TextDocumentItem.create(fileUri.toString(), 'merlin6502', 0, content));
 			});
 		}
+		labels.workspaceFolders = folders;
+		updateWorkspaceDocs();
+		labels.scan_entries(workspaceDocs);
 	}
-	return folders;
 }
 
 function updateWorkspaceDocs() {
@@ -403,24 +413,25 @@ function updateWorkspaceDocs() {
 	}
 }
 
-windowDocs.onWillSave(async listener => {
+windowDocs.onDidOpen(async params => {
 	await waitForInit();
-	updateWorkspaceDocs();
-	validateTextDocument(listener.document);
+	await getAllWorkspaceDocs();
+	validateTextDocument(params.document);
 });
 
-windowDocs.onDidSave(async () => {
+windowDocs.onDidSave(async listener => {
 	await waitForInit();
-	const folders = await getAllWorkspaceDocs();
-	if (folders) {
-		labels.workspaceFolders = folders;
-		labels.setup_entries(workspaceDocs);
-	}
+	await getAllWorkspaceDocs();
+	validateTextDocument(listener.document);
 });
 
 windowDocs.onDidChangeContent(async change => {
 	await waitForInit();
-	updateWorkspaceDocs();
+	if (labels.rescan_entries) {
+		await getAllWorkspaceDocs();
+	} else {
+		updateWorkspaceDocs();
+	}
 	for (const doc of windowDocs.all()) {
 		const included = labels.shared.get(doc.uri)?.includedDocs.has(change.document.uri);
 		if (doc.uri == change.document.uri || included)
@@ -428,27 +439,15 @@ windowDocs.onDidChangeContent(async change => {
 	}
 });
 
-windowDocs.onDidOpen(async params => {
-	await waitForInit();
-	const folders = await getAllWorkspaceDocs();
-	if (folders) {
-		labels.workspaceFolders = folders;
-		labels.setup_entries(workspaceDocs);
-		updateWorkspaceDocs();
-		validateTextDocument(params.document);
-	}
-});
-
 windowDocs.onDidClose(async params => {
 	await waitForInit();
 	if (labels.shared.has(params.document.uri))
 		labels.shared.delete(params.document.uri);
+	await getAllWorkspaceDocs();
 });
 
 async function validateTextDocument(textDocument: vsdoc.TextDocument): Promise<void> {
 	await waitForInit();
-	if (labels.rescan_entries)
-		labels.scan_entries();
 	const diagnostics = diagnosticTool.update(textDocument);
 	connection.sendNotification(new vsserv.NotificationType<string>('merlin6502.interpretation'), diagnosticTool.interpretation);
 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });

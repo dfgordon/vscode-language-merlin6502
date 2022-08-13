@@ -8,19 +8,27 @@ async function diagnosticTester(progName: string, expectedMessages: RegExp[]) {
 	const progPath = path.resolve(__dirname, '..', '..', '..', '..', 'sample', 'test', progName);
 	const doc = await vscode.workspace.openTextDocument(progPath);
 	const ed = await vscode.window.showTextDocument(doc);
+	vscode.languages.setTextDocumentLanguage(doc, 'merlin6502');
 	if (!ed)
 		assert.fail('no active text editor');
-	let collections: [vscode.Uri, vscode.Diagnostic[]][];
-	do {
-		collections = vscode.languages.getDiagnostics();
-	} while (!collections);
-	for (const collection of collections) {
-		if (collection[0].path != doc.uri.path)
-			continue;
-		const diagList = collection[1];
+	let tries = 0;
+	let diagList: vscode.Diagnostic[] | undefined;
+	while (!diagList && tries<20) {
+		const collections = vscode.languages.getDiagnostics();
+		for (const pair of collections) {
+			if (pair[0].toString() == doc.uri.toString())
+				diagList = pair[1];
+		}
+		await new Promise(resolve => setTimeout(resolve, 50));
+		tries += 1;
+	}
+	if (diagList) {
 		assert.strictEqual(diagList.length, expectedMessages.length);
 		for (let i = 0; i < diagList.length; i++)
 			assert.match(diagList[i].message, expectedMessages[i]);
+	} else {
+		if (expectedMessages.length > 0)
+			assert.fail('could net retrieve diagnostics');
 	}
 }
 

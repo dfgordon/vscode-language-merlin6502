@@ -93,7 +93,7 @@ export class LabelSentry extends lxbase.LangExtBase
 	currScopeName = '';
 	currScopeNode : LabelNode | undefined;
 	workspaceDocs = new Array<vsserv.TextDocumentItem>();
-	rescan_entries = false;
+	rescan_entries = true;
 	enclosingRng = vsserv.Range.create(0,0,0,0);
 	typ: lxbase.SourceType = lxbase.SourceOptions.master;
 	currMain: vsserv.TextDocumentItem | null = null;
@@ -348,10 +348,6 @@ export class LabelSentry extends lxbase.LangExtBase
 		if (matches>1 && dispatch==this.dispatch_gather_include)
 			this.diag.push(vsserv.Diagnostic.create(this.enclosingRng,'multiple matches ('+matches+') exist in the workspace',vsserv.DiagnosticSeverity.Error));
 	}
-	setup_entries(docs: Array<vsserv.TextDocumentItem>) {
-		this.workspaceDocs = docs;
-		this.rescan_entries = true;
-	}
 	visit_entries(curs: Parser.TreeCursor) : lxbase.WalkerChoice
 	{
 		if (!this.currModule)
@@ -375,9 +371,9 @@ export class LabelSentry extends lxbase.LangExtBase
 		}
 		return lxbase.WalkerOptions.exit;
 	}
-	scan_entries()
+	scan_entries(docs: Array<vsserv.TextDocumentItem>)
 	{
-		this.rescan_entries = false;
+		this.workspaceDocs = docs;
 		this.entries = new Map<string, Array<LabelNode>>();
 		for (const doc of this.workspaceDocs)
 		{
@@ -392,5 +388,6 @@ export class LabelSentry extends lxbase.LangExtBase
 			}
 			this.currModule = null;
 		}
+		this.rescan_entries = false;
 	}
 }
