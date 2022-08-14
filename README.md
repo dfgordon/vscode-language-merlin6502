@@ -122,6 +122,7 @@ This capability only applies to MacOS. Note that [Virtual \]\[](https://virtuali
 ## Troubleshooting Tips
 
 * VS Code
+    - the language server has trouble with untitled documents; when creating a new document save it early
     - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
     - tab your way to the end of snippets
     - to mitigate diagnostic delay, break large source files into smaller modules
