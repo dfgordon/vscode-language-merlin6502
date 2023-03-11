@@ -21,7 +21,9 @@
 		"onCommand:merlin6502.format",
 		"onCommand:merlin6502.columns",
 		"onCommand:merlin6502.getFrontVii",
-		"onCommand:merlin6502.getAppleWinSaveState"
+		"onCommand:merlin6502.getAppleWinSaveState",
+		"onCommand:merlin6502.getFromDiskImage",
+		"onCommand:merlin6502.saveToDiskImage"
 	],
 	"main": "./client/out/extension.js",
 	"contributes": {
@@ -145,6 +147,14 @@
 			{
 				"command": "merlin6502.getAppleWinSaveState",
 				"title": "merlin6502: Insert from AppleWin save state"
+			},
+			{
+				"command": "merlin6502.getFromDiskImage",
+				"title": "merlin6502: Insert from disk image"
+			},
+			{
+				"command": "merlin6502.saveToDiskImage",
+				"title": "merlin6502: Save to disk image"
 			}
 		],
 		"menus": {
@@ -163,6 +173,14 @@
 				},
 				{
 					"command": "merlin6502.getAppleWinSaveState",
+					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.getFromDiskImage",
+					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.saveToDiskImage",
 					"when": "editorLangId == merlin6502"
 				}
 			]

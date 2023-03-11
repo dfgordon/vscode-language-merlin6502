@@ -4,14 +4,14 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest features*: LSP implementation, simplified operand completions
+*latest features*: disk image support, analysis and parsing patches
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
 * Comprehensive highlights, completions, and hovers
 * Completions and hovers for Apple II soft switches, ROM routines, etc.
-* Insert disassembly from emulator memory
-* Transfer source code to and from emulators
+* Insert disassembly from emulator memory and disk images
+* Transfer source code to and from emulators and disk images
 * Diagnostics to identify errors and gotchas
 * Options : see `Ctrl+Comma` -> `Extensions` -> `Merlin 6502`
 * Commands: see `Ctrl+P` -> `merlin6502`
@@ -28,7 +28,6 @@ There are a few syntax rules that are *always* enforced by the extension, and wh
 * All delimited strings ("dstrings") must be terminated
 * The characters `;[{}<>=` cannot be used in any label
 * The character `]` cannot be used in any label, except to start a variable
-* If the whole line is a comment, the first character must be `*`
 
 ## About Columns and Case
 
@@ -119,6 +118,14 @@ You can transfer code to and from the [Virtual \]\[](https://virtualii.com) emul
 
 This capability only applies to MacOS. Note that [Virtual \]\[](https://virtualii.com) is not part of the extension, and must be installed separately.
 
+## Using with Disk Images
+
+You can access files on a disk image.  In order to do this you must install `a2kit`.  If you have `cargo`, use the terminal to run `cargo install a2kit`, otherwise see the [github page](https://github.com/dfgordon/a2kit).  The extension will work with whatever image types `a2kit` supports.  As of this writing, the supported types are `woz`, `dsk`, `do`, `po`, `d13`.
+
+* `merlin6502: Insert from disk image`: brings up a file selector allowing you to choose an image file.  Once done, use the mini-menu to traverse the image's directory tree (if applicable) and select either a `TXT` or `BIN` file.  If a `TXT` file is selected it will be decoded as Merlin source and inserted. If a `BIN` file is selected, respond to the disassembly prompts, after which the disassembly is inserted.
+
+* `merlin6502: Save to disk image`: After choosing the image file, use the mini-menu to traverse the image's directory tree (if applicable) and select a directory (`.` selects the current level).  Enter the name that the saved file will be given on the disk image.  If the file already exists you must respond to a warning.  The saved file will be encoded as a Merlin source file.
+
 ## Troubleshooting Tips
 
 * VS Code
@@ -127,6 +134,9 @@ This capability only applies to MacOS. Note that [Virtual \]\[](https://virtuali
     - tab your way to the end of snippets
     - to mitigate diagnostic delay, break large source files into smaller modules
     - if symbol information doesn't load try forcing a diagnostic update
+* Disk Images
+    - update a2kit from time to time
+    - Do not write to disk images while they are mounted in an emulator
 * Disassembly
     - verify that the starting address is aligned with an instruction opcode
     - stop disassembly before start of data

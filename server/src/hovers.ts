@@ -40,30 +40,18 @@ export class TSHoverProvider extends lxbase.LangExtBase
 	}
 	addr_hover(hover:Array<vsserv.MarkupContent>,curs:Parser.TreeCursor) : boolean
 	{
-		if (curs.nodeType=="number")
+		if (curs.nodeType=="num")
 		{
-			let display = false;
-			// is this an address operand?
-			const mode = curs.currentNode().parent;
-			if (mode && mode.type.substring(0,4)=="addr")
-				display = true;
-			// is this an equate?
-			const prev = curs.currentNode().previousNamedSibling;
-			if (prev && prev.type=="psop_equ")
-				display = true;
-			if (display)
+			let parsed = this.parse_merlin_number(curs.nodeText);
+			if (!isNaN(parsed))
 			{
-				let parsed = this.parse_merlin_number(curs.nodeText);
-				if (!isNaN(parsed))
+				if (parsed>=2**15)
+					parsed = parsed - 2**16;
+				const temp = this.addresses.get(parsed);
+				if (temp)
 				{
-					if (parsed>=2**15)
-						parsed = parsed - 2**16;
-					const temp = this.addresses.get(parsed);
-					if (temp)
-					{
-						temp.forEach(s => hover.push(s));
-						return true;
-					}
+					temp.forEach(s => hover.push(s));
+					return true;
 				}
 			}
 		}
@@ -103,7 +91,42 @@ export class TSHoverProvider extends lxbase.LangExtBase
 					this.hover.push(MarkdownString('positive ASCII dstring'));
 				return lxbase.WalkerOptions.exit;
 			}
-			if (curs.nodeType=='label_ref' && curs.currentNode().firstChild?.type=='global_label')
+			if (curs.nodeType == 'nchar') {
+				this.hover.push(MarkdownString('negative ASCII character'));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType == 'pchar') {
+				this.hover.push(MarkdownString('positive ASCII character'));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType == 'data_prefix') {
+				this.hover.push(MarkdownString('data prefix. `<` or `#<` = lo-byte, `>` or `#>` = hi-byte (default)\n\n`#` does nothing.'));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType == 'imm_prefix' && this.merlinVersion=='v8') {
+				this.hover.push(MarkdownString(
+'immediate mode, the operand is a number, not an address\n\n\
+`#` or `#<` = lo-byte, `#>` = hi-byte'));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType == 'imm_prefix' && this.merlinVersion!='v8') {
+				this.hover.push(MarkdownString(
+'immediate mode, the operand is a number, not an address\n\n\
+`#` or `#<` = lo-byte/word, `#>` = hi-byte/word, `#^` = bank byte'));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType == 'addr_prefix') {
+				this.hover.push(MarkdownString('address modifier, `<` = lo-byte, `>` = lo-word, `^` = hi-word, `|` = 24-bits'));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType == 'num_str_prefix') {
+				this.hover.push(MarkdownString(
+"number prefix, the expression's value is converted to text\n\n\
+`#` or `#'` = positive ASCII, `#\"` = negative ASCII\n\n\
+add `>` to right justify in 5 column field, e.g. `#'>`"));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType=='label_ref' && curs.currentNode().firstChild?.type=='global_label' || curs.nodeType=='macro_ref')
 			{
 				let nodes = this.labelSet?.globals.get(curs.nodeText);
 				if (!nodes)
@@ -128,27 +151,39 @@ export class TSHoverProvider extends lxbase.LangExtBase
 				}
 				return lxbase.WalkerOptions.exit;
 			}
-			if (curs.nodeType=='label_def' && curs.currentNode().firstChild?.type=='global_label')
+			if (curs.nodeType == 'macro_def') {
+				this.hover.push(MarkdownString('macro defined right here'));
+				return lxbase.WalkerOptions.exit;
+			}
+			if (curs.nodeType=='label_def')
 			{
-				const next = curs.currentNode().nextNamedSibling;
-				const entries = this.labelSentry.entries.get(curs.nodeText);
-				this.hover.push(MarkdownString('defined right here'));
-				if (!entries)
+				const inner = curs.currentNode().firstChild?.type;
+				if (inner == 'local_label') {
+					this.hover.push(MarkdownString('local defined right here'));
 					return lxbase.WalkerOptions.exit;
-				if (next && next.type=='psop_ent')
+				} else if (inner == 'var_label') {
+					this.hover.push(MarkdownString('variable defined right here'));
 					return lxbase.WalkerOptions.exit;
-				for (const node of entries)
-				{
-					const row = node.rng.start.line
-					if (node.doc) {
-						if (node.doc == this.currDoc)
-							this.hover.push(MarkdownString('entry found on line ' + (row + 1) +
-								'\n```\n' + node.doc.text.split('\n')[row] + '\n```'));
-						else
-							this.hover.push(MarkdownString('entry found in file\n\n' +
-								lxbase.relativeToWorkspace(this.labelSentry.workspaceFolders,node.doc.uri) +
-								'\n\non line ' + (row+1) + 
-								'\n```\n' + node.doc.text.split('\n')[row] + '\n```'));
+				} else if (inner == 'global_label') {
+					this.hover.push(MarkdownString('global defined right here'));
+					// const next = curs.currentNode().nextNamedSibling;
+					const entries = this.labelSentry.entries.get(curs.nodeText);
+					if (!entries)
+						return lxbase.WalkerOptions.exit;
+					// if (next && next.type == 'psop_ent')
+					// 	return lxbase.WalkerOptions.exit;
+					for (const node of entries) {
+						const row = node.rng.start.line
+						if (node.doc) {
+							if (node.doc == this.currDoc)
+								this.hover.push(MarkdownString('entry found on line ' + (row + 1) +
+									'\n```\n' + node.doc.text.split('\n')[row] + '\n```'));
+							else
+								this.hover.push(MarkdownString('entry found in file\n\n' +
+									lxbase.relativeToWorkspace(this.labelSentry.workspaceFolders, node.doc.uri) +
+									'\n\non line ' + (row + 1) +
+									'\n```\n' + node.doc.text.split('\n')[row] + '\n```'));
+						}
 					}
 				}
 				return lxbase.WalkerOptions.exit;

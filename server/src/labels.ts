@@ -23,7 +23,11 @@ function AddLabel(txt: string,lnode: LabelNode,map: Map<string,Array<LabelNode>>
 	if (lnode.isDef && !lnodes[0].definedAnywhere)
 		for (const node of lnodes)
 			node.definedAnywhere = true;
+	if (lnode.isSub && !lnodes[0].isSub)
+		for (const node of lnodes)
+			node.isSub = true;
 	lnode.definedAnywhere = lnodes[0].definedAnywhere;
+	lnode.isSub = lnodes[0].isSub;
 }
 
 export class ChildLabel
@@ -45,28 +49,29 @@ export class LabelNode
 	isDec: boolean;
     isDef: boolean;
 	isRef: boolean;
+	isSub: boolean;
 	definedAnywhere: boolean;
 	children: ChildLabel[];
 	constructor(doc: vsserv.TextDocumentItem, node: Parser.SyntaxNode, rng: vsserv.Range)
 	{
+		const next = node.nextNamedSibling;
 		const parent = node.parent;
 		this.doc = doc;
 		this.rng = rng;
 		this.isEntry = false;
 		this.isExternal = false;
-		if (parent && parent.type=="pseudo_operation")
-		{
-			for (const child of parent.children)
-			{
-				if (child.type=="psop_ent")
-					this.isEntry = true;
-				if (child.type=="psop_ext" || child.type=="psop_exd")
-					this.isExternal = true;
-			}
-		}
+		this.isSub = false;
+		if (parent && parent.type == "arg_ent" || next && next.type == "psop_ent")
+			this.isEntry = true;
+		if (parent && parent.type == "arg_ext" || next && next.type == "psop_ext")
+			this.isExternal = true;
+		if (parent && parent.type == "arg_exd" || next && next.type == "psop_exd")
+			this.isExternal = true;
+		if (node.type == "label_ref" && parent?.parent?.previousNamedSibling?.type == "op_jsr")
+			this.isSub = true;
 		this.isDec = this.isExternal || this.isEntry;
-		this.isDef = node.type == "label_def";
-		this.isRef = node.type == "label_ref";
+		this.isDef = node.type == "label_def" || node.type == "macro_def";
+		this.isRef = node.type == "label_ref" || node.type == "macro_ref";
 		this.definedAnywhere = this.isDef; // to be updated externally
 		this.children = []; // to be updated externally
 	}
@@ -111,12 +116,12 @@ export class LabelSentry extends lxbase.LangExtBase
 		const child = curr.firstNamedChild;
 		if (!this.currDoc)
 			return;
-		if (child && curr.type=='label_def')
+		if (child && curr.type == 'macro_def')
 		{
 			if (this.typ != lxbase.SourceOptions.master)
 				this.labels.includedDocs.add(this.currDoc.uri);
 			const lnode = new LabelNode(this.currDoc, curr, lxbase.curs_to_range(curs, this.row, this.col)); // `rng` could be enclosing range, so recompute
-			if (child.type=='global_label' && curs.currentFieldName()=='mac')
+			if (child.type=='global_label')
 			{
 				if (this.typ==lxbase.SourceOptions.put)
 					diag.push(vsserv.Diagnostic.create(rng,'macros are not allowed in PUT files'));
@@ -127,8 +132,18 @@ export class LabelSentry extends lxbase.LangExtBase
 				if (Defined(child.text,this.labels.globals))
 					diag.push(vsserv.Diagnostic.create(rng,'macro name is used previously as a label',vsserv.DiagnosticSeverity.Error));
 				AddLabel(child.text, lnode, this.labels.macros);
+			}			
+			else
+			{
+				diag.push(vsserv.Diagnostic.create(rng,'macro label needs to be global',vsserv.DiagnosticSeverity.Error));
 			}
-			else if (child.type=='global_label')
+		}
+		if (child && curr.type=='label_def')
+		{
+			if (this.typ != lxbase.SourceOptions.master)
+				this.labels.includedDocs.add(this.currDoc.uri);
+			const lnode = new LabelNode(this.currDoc, curr, lxbase.curs_to_range(curs, this.row, this.col)); // `rng` could be enclosing range, so recompute
+			if (child.type=='global_label')
 			{
 				if (Defined(child.text,this.labels.globals))
 					diag.push(vsserv.Diagnostic.create(rng,'redefinition of a global label',vsserv.DiagnosticSeverity.Error));
@@ -137,10 +152,6 @@ export class LabelSentry extends lxbase.LangExtBase
 				AddLabel(child.text, lnode, this.labels.globals);
 				this.currScopeName = child.text;
 				this.currScopeNode = lnode;
-			}
-			else if (curs.currentFieldName()=='mac')
-			{
-				diag.push(vsserv.Diagnostic.create(rng,'macro label needs to be global',vsserv.DiagnosticSeverity.Error));
 			}
 			else if (child.type=='local_label')
 			{
@@ -156,12 +167,16 @@ export class LabelSentry extends lxbase.LangExtBase
 				AddLabel(child.text,lnode,this.labels.vars);
 			}
 		}
+		if (child && curr.type == 'macro_ref')
+		{
+            const lnode = new LabelNode(this.currDoc,curr,lxbase.curs_to_range(curs,this.row,this.col)); // `rng` could be enclosing range, so recompute
+			if (child.type=='global_label')
+				AddLabel(child.text,lnode,this.labels.macros);
+		}
 		if (child && curr.type == 'label_ref')
 		{
             const lnode = new LabelNode(this.currDoc,curr,lxbase.curs_to_range(curs,this.row,this.col)); // `rng` could be enclosing range, so recompute
-			if (child.type=='global_label' && curs.currentFieldName()=='mac')
-				AddLabel(child.text,lnode,this.labels.macros);
-			else if (child.type=='global_label')
+			if (child.type=='global_label')
 				AddLabel(child.text,lnode,this.labels.globals);
 			else if (child.type=='local_label') {
 				const xName = this.currScopeName + '\u0100' + child.text;
@@ -190,12 +205,12 @@ export class LabelSentry extends lxbase.LangExtBase
 				diag.push(vsserv.Diagnostic.create(rng,'unmatched end of macro (EOM terminates all preceding MAC pseudo-ops)',vsserv.DiagnosticSeverity.Error));
 			this.inMacro = false;
 		}
-		else if (curr.type=='label_def' && curs.currentFieldName()=='mac')
+		else if (curr.type=='macro_def')
 		{
 			this.running.add(curr.text);
 			this.inMacro = true;
 		}
-		else if (curr.type=='label_ref' && curs.currentFieldName()=='mac')
+		else if (curr.type=='macro_ref')
 		{
 			const count = diag.length;
 			if (!Defined(curr.text,this.labels.macros) && Defined(curr.text,this.labels.globals))
@@ -207,7 +222,7 @@ export class LabelSentry extends lxbase.LangExtBase
 			if (count<diag.length)
 				return;
 		}
-		else if (child && curr.type=='label_ref' && curs.currentFieldName()!='mac')
+		else if (child && curr.type=='label_ref')
 		{
 			const count = diag.length;
 			if (child.type=='global_label' && Defined(curr.text,this.labels.macros))
@@ -361,7 +376,7 @@ export class LabelSentry extends lxbase.LangExtBase
 				AddLabel(child1.text,new LabelNode(this.currModule,child1,lxbase.node_to_range(child1,this.row,this.col)),this.entries);
 			if (child1 && child1.type=='psop_ent')
 			{
-				let sib = child1.nextNamedSibling;
+				let sib = child1.nextNamedSibling?.firstNamedChild;
 				while (sib && sib.type=='label_ref')
 				{
 					AddLabel(sib.text,new LabelNode(this.currModule,sib,lxbase.node_to_range(sib,this.row,this.col)),this.entries);

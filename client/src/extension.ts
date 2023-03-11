@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as com from './commands';
+import * as dimg from './diskImage';
 import * as vsclnt from 'vscode-languageclient/node';
 import * as path from 'path';
 
@@ -30,11 +31,12 @@ export function activate(context: vscode.ExtensionContext)
 	client.start();
 	const disassembler = new com.DisassemblyTool();
 	const formatter = new com.FormattingTool();
+	const a2kit = new dimg.A2KitTool();
 
 	const versionIndicator = vscode.window.createStatusBarItem();
 	const typeIndicator = vscode.window.createStatusBarItem();
 	versionIndicator.text = vscode.workspace.getConfiguration('merlin6502').get('version') as string;
-	versionIndicator.tooltip = 'Merlin version begin targeted (see settings)';
+	versionIndicator.tooltip = 'Merlin version being targeted (see settings)';
 	typeIndicator.text = 'source';
 	typeIndicator.tooltip = 'How the file is interpreted, as source or linker commands'
 
@@ -48,6 +50,8 @@ export function activate(context: vscode.ExtensionContext)
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",disassembler.getAppleWinSaveState,disassembler));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",formatter.showPasteableProgram,formatter));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.columns", formatter.resizeColumns, formatter));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFromDiskImage", a2kit.getFromImage, a2kit));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.saveToDiskImage", a2kit.putToImage, a2kit));
 
 	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
 		if (editor?.document.languageId == 'merlin6502') {

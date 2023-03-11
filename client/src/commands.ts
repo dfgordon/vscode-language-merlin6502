@@ -10,6 +10,7 @@ import { client } from './extension';
 
 type DisassemblyParams = {
 	getWhat: string,
+	imgOffset: number,
 	addrRange: [number, number],
 	xc: number,
 	label: string
@@ -69,69 +70,60 @@ export class FormattingTool
 
 export class DisassemblyTool
 {
-	async getAddressInput(name: string,min:number,max:number) : Promise<number | undefined>
+	async getAddressInput(name: string,min:number,max:number,suggestion:number) : Promise<number | undefined>
 	{
-		const res = await vscode.window.showInputBox({title:'enter '+name+' address'});
-		if (res==undefined)
-			return;
-		const addr = parseInt(res);
-		if (addr<min || addr>max)
-		{
-			vscode.window.showErrorMessage('address is out of range ('+min+'-'+max+')');
-			return;
-		}
-		return addr;
+		const res = await vscode.window.showInputBox({
+			title: 'enter ' + name + ' address',
+			value: suggestion.toString(),
+			validateInput: (value) => {
+				const val = parseInt(value);
+				if (isNaN(val))
+					return "address should be a number"
+				if (val < min || val > max)
+					return "range is " + min + " to " + max;
+				return undefined;
+			}
+		});
+		if (!res)
+			return undefined;
+		return parseInt(res);
 	}
-	async getInsertionParameters(max:number) : Promise<DisassemblyParams | undefined>
-	{
-		const getWhat = await vscode.window.showQuickPick(['Merlin Source','Disassembly: Ranged','Disassembly: Last DOS 3.3 BLOAD','Disassembly: Last ProDOS BLOAD'],{title:'Insert what?'});
-		if (!getWhat)
-			return;
+	async getDisassemblyParameters(getWhat: string, imgOffset: number, minAddr: number, maxAddr: number): Promise<DisassemblyParams | undefined> {
 		let startAddr : number|undefined = 0;
 		let endAddr : number|undefined = 0;
 		let xc = 0;
 		let lbl : string|undefined = 'label every line';
-		if (getWhat.substring(0,11)=='Disassembly')
-		{
-			// if last BLOAD was requested, leave [startAddr,endAddr] as [0,0] and server will update based on memory image
-			if (getWhat.slice(-6)=='Ranged')
-				startAddr = await this.getAddressInput('starting',0,max-1);
-			if (startAddr==undefined)
-				return;
-			if (getWhat.slice(-6)=='Ranged')
-				endAddr = await this.getAddressInput('ending',startAddr+1,max);
-			if (endAddr==undefined)
-				return;
-			const res = await vscode.window.showQuickPick(['6502','65C02','65816'],{title:'Processor Target'});
-			if (!res)
-				return;
-			if (res=='65C02')
-				xc = 1;
-			if (res=='65816')
-				xc = 2;
-			lbl = await vscode.window.showQuickPick(['label every line','label some lines','label no lines'],{title:'Label Policy'});
-			if (!lbl)
-				return;
-		}
-		return { getWhat: getWhat, addrRange: [startAddr, endAddr], xc: xc, label: lbl };
+		// if last BLOAD was requested, leave startAddr=endAddr=0 and server will get the range from the memory image
+		if (getWhat.slice(-6)=='Ranged')
+			startAddr = await this.getAddressInput('starting',minAddr,maxAddr-1,minAddr);
+		if (startAddr==undefined)
+			return;
+		if (getWhat.slice(-6)=='Ranged')
+			endAddr = await this.getAddressInput('ending',startAddr+1,maxAddr,maxAddr);
+		if (endAddr==undefined)
+			return;
+		const res = await vscode.window.showQuickPick(['6502','65C02','65816'],{title:'Processor Target'});
+		if (!res)
+			return;
+		if (res=='65C02')
+			xc = 1;
+		if (res=='65816')
+			xc = 2;
+		lbl = await vscode.window.showQuickPick(['label every line','label some lines','label no lines'],{title:'Label Policy'});
+		if (!lbl)
+			return;
+		return { getWhat: getWhat, imgOffset: imgOffset, addrRange: [startAddr, endAddr], xc: xc, label: lbl };
 	}
-	getMerlinSource(img: Buffer,auxZP: Buffer|undefined) : string
+	async getInsertionParameters(max:number) : Promise<DisassemblyParams | undefined>
 	{
-		const startAddr = auxZP ? auxZP[10] + 256*auxZP[11] : img[10] + 256*img[11];
-		const endAddr = auxZP ? auxZP[14] + 256*auxZP[15] : img[14] + 256*img[15];
-		let code = '';
-		for (let i=startAddr;i<endAddr;i++)
-		{
-			const charCode = img[i];
-			if (charCode<128)
-				code += String.fromCharCode(charCode);
-			else if (String.fromCharCode(charCode-128)==' ')
-				code += '\t';
-			else
-				code += String.fromCharCode(charCode-128);
-
+		const getWhat = await vscode.window.showQuickPick(['Merlin Source', 'Disassembly: Ranged', 'Disassembly: Last DOS 3.3 BLOAD', 'Disassembly: Last ProDOS BLOAD'], { title: 'Insert what?' });
+		if (!getWhat)
+			return;
+		if (getWhat.substring(0, 11) == 'Disassembly') {
+			const params = await this.getDisassemblyParameters(getWhat, 0, 0, max);
+			return params;
 		}
-		return code;
+		return { getWhat: getWhat, imgOffset: 0, addrRange: [0, 0], xc: 0, label: '' };
 	}
 	openAppleWinSaveState(uri : vscode.Uri[]|undefined) : [[string,string][],[string,string][]] | undefined
 	{
@@ -165,7 +157,7 @@ export class DisassemblyTool
 	async insertCode(params:DisassemblyParams,img:Buffer,auxZP:Buffer|undefined)
 	{
 		let content = '';
-		if (params.getWhat.substring(0,11) == 'Disassembly') {
+		if (params.getWhat.substring(0, 11) == 'Disassembly') {
 			const img_messg: number[] = Array.from(Uint8Array.from(img));
 			content = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
 				{
@@ -176,10 +168,18 @@ export class DisassemblyTool
 					]
 				});
 		}
-		else
-			content = this.getMerlinSource(img,auxZP);
+		else {
+			const startAddr = auxZP ? auxZP[10] + 256*auxZP[11] : img[10] + 256*img[11];
+			const endAddr = auxZP ? auxZP[14] + 256 * auxZP[15] : img[14] + 256 * img[15];
+			const img_messg: number[] = Array.from(Uint8Array.from(img));
+			content = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
+				{
+					command: 'merlin6502.detokenize',
+					arguments: img_messg.slice(startAddr,endAddr)
+				});
+		}
 		const verified = lxbase.verify_document();
-		if (verified && content.length>1)
+		if (verified && content && content.length>1)
 			verified.ed.edit( edit => { edit.replace(verified.ed.selection,content); });
 		else if (verified)
 			vscode.window.showWarningMessage('insert failed (no code found)');

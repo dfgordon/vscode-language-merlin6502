@@ -226,7 +226,7 @@ export class LangExtBase
 				this.xcCount = 2;
 			return WalkerOptions.exit;
 		}
-		if (curr.type=='label_ref' && curs.currentFieldName()=='mac' && ['LNK','LKV','ASM'].includes(curr.text.toUpperCase()))
+		if (curr.type=='macro_ref' && ['LNK','LKV','ASM'].includes(curr.text.toUpperCase()))
 		{
 			this.linkerCount += 1;
 			return WalkerOptions.exit;
@@ -277,7 +277,7 @@ export class LangExtBase
 	{
 		// Doing this with regex only - have to be careful
 		const programLine = lines[this.row];
-		if (programLine.charAt(0)=='*')
+		if (programLine.charAt(0)=='*' || programLine.charAt(0)==';')
 			return programLine;
 		const match = programLine.match(/\s+\S+/);
 		let prefix = '';

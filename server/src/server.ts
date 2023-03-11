@@ -5,7 +5,7 @@ import * as comm from './commands';
 import * as hov from './hovers';
 import * as compl from './completions';
 import * as tok from './semanticTokens';
-import {LabelSentry, LabelNode} from './labels';
+import {LabelSentry, LabelNode, LabelSet} from './labels';
 import * as lxbase from './langExtBase';
 import * as Parser from 'web-tree-sitter';
 import { defaultSettings } from './settings';
@@ -21,6 +21,7 @@ let codeTool: compl.codeCompletionProvider;
 let addressTool: compl.AddressCompletionProvider;
 let disassembler: comm.DisassemblyTool;
 let formatter: comm.FormattingTool;
+let tokenizer: comm.Tokenizer;
 let tokens: tok.TokenProvider;
 let labels: LabelSentry;
 
@@ -45,6 +46,7 @@ async function startServer()
 	addressTool = new compl.AddressCompletionProvider(globalSettings);
 	disassembler = new comm.DisassemblyTool(TSInitResult, globalSettings);
 	formatter = new comm.FormattingTool(TSInitResult, globalSettings, labels);
+	tokenizer = new comm.Tokenizer(TSInitResult, globalSettings, labels);
 	tokens = new tok.TokenProvider(TSInitResult, globalSettings, labels);
 }
 
@@ -119,6 +121,7 @@ connection.onDidChangeConfiguration(() => {
 		addressTool.configure(globalSettings);
 		disassembler.configure(globalSettings);
 		formatter.configure(globalSettings);
+		tokenizer.configure(globalSettings);
 		tokens.configure(globalSettings);
 		labels.configure(globalSettings);
 	}).then(() => {
@@ -222,7 +225,10 @@ function documentSymbolFromMap(map: Map<string, LabelNode[]>, kind: vsserv.Symbo
 				for (const child of node.children) {
 					children.push(vsserv.DocumentSymbol.create(child.name, 'local', vsserv.SymbolKind.Constant, child.loc.range, child.loc.range));
 				}
-				ans.push(vsserv.DocumentSymbol.create(name, detail, kind, node.rng, node.rng, children));
+				if (node.isSub)
+					ans.push(vsserv.DocumentSymbol.create(name, detail, vsserv.SymbolKind.Function, node.rng, node.rng, children));
+				else
+					ans.push(vsserv.DocumentSymbol.create(name, detail, kind, node.rng, node.rng, children));
 			}
 		}
 	}
@@ -334,11 +340,12 @@ connection.onCompletion((params: vsserv.CompletionParams): vsserv.CompletionItem
 
 connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise<any> => {
 	await waitForInit();
-	if (params.command == 'merlin6502.pasteFormat') {
+	let labelSet: LabelSet | undefined = undefined;
+	if (["merlin6502.pasteFormat", "merlin6502.tokenize"].includes(params.command)) {
 		if (params.arguments) {
 			const lines : string[] = params.arguments[0];
 			const uri: string = params.arguments[1];
-			let labelSet = labels.shared.get(uri);
+			labelSet = labels.shared.get(uri);
 			let tries = 0;
 			while (!labelSet && tries<20) {
 				await new Promise(resolve => setTimeout(resolve, 50));
@@ -347,8 +354,11 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 			}
 			if (!labelSet)
 				return '* could not find document symbols';
-			return formatter.formatForMerlin(lines,labelSet.macros);
-		}
+			if (params.command == 'merlin6502.pasteFormat')
+				return formatter.formatForPaste(lines, labelSet.macros);
+			else if (params.command == 'merlin6502.tokenize')
+				return tokenizer.tokenize(lines, labelSet.macros);
+		}		
 	}
 	else if (params.command == 'merlin6502.disassemble') {
 		if (params.arguments) {
@@ -357,6 +367,10 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 			const result = disassembler.disassemble(img, disassemblyParams);
 			return result;
 		}
+	}
+	else if (params.command == 'merlin6502.detokenize') {
+		if (params.arguments)
+			return tokenizer.detokenize(params.arguments);
 	}
 });
 

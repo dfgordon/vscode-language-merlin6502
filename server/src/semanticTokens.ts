@@ -36,7 +36,7 @@ export class TokenProvider extends lxbase.LangExtBase
 	{
 		const rng = lxbase.curs_to_range(curs, this.row, this.col);
 		const pos : [number,number,number] = [rng.start.line, rng.start.character, rng.end.character - rng.start.character];
-		if (curs.currentFieldName()=='mac')
+		if (["macro_def","macro_ref"].includes(curs.nodeType))
 		{
 			this.tokensBuilder.push(...pos,...tokType('macro'));
 			return lxbase.WalkerOptions.gotoSibling;
@@ -56,7 +56,7 @@ export class TokenProvider extends lxbase.LangExtBase
 			this.tokensBuilder.push(...pos,...tokType('variable'));
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (["main_comment","comment"].includes(curs.nodeType))
+		if (["heading","comment"].includes(curs.nodeType))
 		{
 			this.tokensBuilder.push(...pos,...tokType('comment'));
 			return lxbase.WalkerOptions.gotoSibling;
@@ -71,12 +71,12 @@ export class TokenProvider extends lxbase.LangExtBase
 			this.tokensBuilder.push(...pos,...tokType('keyword'));
 			return lxbase.WalkerOptions.gotoChild;
 		}
-		if (curs.nodeType.slice(0,5)=="mode_")
+		if (curs.nodeType=="mode")
 		{
 			this.tokensBuilder.push(...pos,...tokType('keyword'));
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (["imm_prefix","addr_prefix","num_str_prefix"].includes(curs.nodeType))
+		if (["imm_prefix","addr_prefix","num_str_prefix","data_prefix"].includes(curs.nodeType))
 		{
 			this.tokensBuilder.push(...pos,...tokType('keyword'));
 			return lxbase.WalkerOptions.gotoSibling;
@@ -91,7 +91,7 @@ export class TokenProvider extends lxbase.LangExtBase
 			this.tokensBuilder.push(...pos,...tokType('string'));
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (["number","hex_data"].indexOf(curs.nodeType)>-1)
+		if (["num","hex_data"].indexOf(curs.nodeType)>-1)
 		{
 			this.tokensBuilder.push(...pos,...tokType('number'));
 			return lxbase.WalkerOptions.gotoSibling;

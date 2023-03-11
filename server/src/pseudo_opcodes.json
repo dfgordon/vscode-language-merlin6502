@@ -1018,7 +1018,7 @@
         "alt": [
             ">>>"
         ],
-        "args": "seq(field('mac',$.label_ref),optional(seq($._arg_sep,$.macro_args)))",
+        "args": "seq($.macro_ref,optional(seq($._arg_sep,$.arg_macro)))",
         "brief": "put macro call",
         "category": "macro",
         "caveat": "macro label can also go directly in the instruction column",

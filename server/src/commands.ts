@@ -20,9 +20,33 @@ type OpData =
 
 export type DisassemblyParams = {
 	getWhat: string,
+	imgOffset: number,
 	addrRange: [number, number],
 	xc: number,
 	label: string
+}
+
+/**
+ * Format line of code, assuming a unique token has been put in for the separators
+ * @param line line to format
+ * @param sep the column separator token, assumed to be unique
+ * @param widths the widths of columns 1,2,3
+ */
+function formatTokens(line: string, sep: string, widths: number[]): string {
+	const cols = line.split(sep);
+	let formattedLine = '';
+	for (let i=0;i<cols.length;i++)
+	{
+		let prepadding = 0;
+		if (cols[i].charAt(0)==';')
+			for (let j=i;j<3;j++)
+				prepadding += widths[j];
+		const padding = widths[i] - cols[i].length;
+		formattedLine += ' '.repeat(prepadding) + cols[i];
+		if (i+1 < cols.length)
+			formattedLine += (padding > 0 ? ' '.repeat(padding) : ' ');
+	}
+	return formattedLine;
 }
 
 export class FormattingTool extends lxbase.LangExtBase
@@ -33,7 +57,7 @@ export class FormattingTool extends lxbase.LangExtBase
 	callToken = '\u0100';
 	persistentSpace = '\u0100';
 	widths = [9, 6, 11];
-	doNotFormat = ['dstring', 'comment_text','literal'];
+	doNotFormat = ['dstring', 'txt', 'literal'];
 	// following taken from completions and has extra info.
 	// here we only need to know if the value is empty or not.
 	complMap = Object({
@@ -86,11 +110,13 @@ export class FormattingTool extends lxbase.LangExtBase
 	format_node(curs: Parser.TreeCursor) : lxbase.WalkerChoice
 	{
 		// Persistent spaces
-		if (['literal_arg','dstring','dos33','literal','comment_text'].includes(curs.nodeType))
-			this.formattedLine = this.replace_curs(curs.nodeText.replace(/ /g,this.persistentSpace),curs);
+		if (curs.nodeType.slice(0, 4) == "arg_" || curs.nodeType == "comment" || curs.nodeType == "heading") {
+			this.formattedLine = this.replace_curs(curs.nodeText.replace(/ /g, this.persistentSpace), curs);
+			return lxbase.WalkerOptions.gotoSibling;
+		}
 		return lxbase.WalkerOptions.gotoChild;
 	}
-	formatForMerlin(lines: string[], macros: Map<string,Array<labels.LabelNode>>) : string
+	formatForPaste(lines: string[], macros: Map<string,Array<labels.LabelNode>>) : string
 	{
 		this.GetProperties(lines);
 		this.formattedCode = '';
@@ -119,18 +145,8 @@ export class FormattingTool extends lxbase.LangExtBase
 				this.formattedLine = this.AdjustLine(lines,macros);
 				const tree = this.parse(this.formattedLine,"\n");
 				this.walk(tree,this.format_node.bind(this));
-				this.formattedLine = this.formattedLine.replace(RegExp('^'+this.callToken),'').replace(/\s+/g,' ');
-				const cols = this.formattedLine.split(' ');
-				this.formattedLine = '';
-				for (let i=0;i<cols.length;i++)
-				{
-					let prepadding = 0;
-					if (cols[i].charAt(0)==';')
-						for (let j=i;j<3;j++)
-							prepadding += this.widths[j];
-					const padding = this.widths[i] - cols[i].length;
-					this.formattedLine += ' '.repeat(prepadding) + cols[i] + (padding>0 ? ' '.repeat(padding) : ' ');
-				}
+				this.formattedLine = this.formattedLine.replace(RegExp('^' + this.callToken), '').replace(/\s+/g, ' ');
+				this.formattedLine = formatTokens(this.formattedLine, ' ', this.widths);
 				this.formattedLine = this.formattedLine.trimEnd().replace(RegExp(this.persistentSpace,'g'),' ');
 				formattedDoc += this.formattedLine;
 			}
@@ -160,7 +176,7 @@ export class FormattingTool extends lxbase.LangExtBase
 			if (parent && this.doNotFormat.includes(parent.type))
 				return [];
 		}
-		if (ch == ';' && lines[position.line].charAt(position.character-2)==' ')
+		if (ch == ';' && (position.character<2 || lines[position.line].charAt(position.character-2)==' '))
 		{
 			if (position.character <= stop3)
 				return [vsserv.TextEdit.replace(vsserv.Range.create(lxbase.translatePos(position,0,-1), position), ' '.repeat(stop3 - position.character + 1) + ';')];
@@ -187,8 +203,150 @@ export class FormattingTool extends lxbase.LangExtBase
 	}
 }
 
-export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBase here?
+export class Tokenizer extends lxbase.LangExtBase
 {
+	labelSentry: labels.LabelSentry;
+	line = "";
+	tokenizedLine: Array<number> | undefined = new Array<number>();
+	tokenizedProgram = new Array<number>();
+	columns = 0;
+	widths = [9, 6, 11];
+	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings, sentry: labels.LabelSentry)
+	{
+		super(TSInitResult,settings);
+		this.labelSentry = sentry;
+		this.set_widths();
+	}
+	set_widths()
+	{
+		this.widths = [
+			this.config.columns.c1,
+			this.config.columns.c2,
+			this.config.columns.c3
+		]
+	}
+	visit(curs: Parser.TreeCursor): lxbase.WalkerChoice {
+		if (!this.tokenizedLine)
+			return lxbase.WalkerOptions.abort;
+		// Two tasks here:
+		// 1. convert string to ASCII bytes (to be inverted later)
+		// 2. insert column separators
+
+		const parent = curs.currentNode().parent;
+
+		// root level comment needs no separator, Merlin will indent it automatically
+		if (curs.nodeType == "comment" && parent?.type == "source_file") {
+			for (const c of curs.nodeText)
+				this.tokenizedLine.push(c.charCodeAt(0));
+			return lxbase.WalkerOptions.gotoSibling;
+		}
+
+		if (parent?.parent?.type == "source_file") {
+			if (curs.nodeType.length > 3) {
+				if (curs.nodeType.substring(0, 3) == "op_") {
+					this.tokenizedLine.push(0xa0);
+					this.columns = 2;
+				}
+			}
+			if (curs.nodeType.length > 5) {
+				if (curs.nodeType.substring(0, 5) == "psop_") {
+					this.tokenizedLine.push(0xa0);
+					this.columns = 2;
+				}
+			}
+			if (curs.nodeType == "macro_ref") {
+				this.tokenizedLine.push(0xa0);
+				this.columns = 2;
+			}
+			if (curs.nodeType.length > 4) {
+				if (curs.nodeType.substring(0, 4) == "arg_") {
+					this.tokenizedLine.push(0xa0);
+					this.columns = 3;
+				}
+			}
+			if (curs.nodeType == "comment") {
+				for (let rep = this.columns; rep < 4; rep++) {
+					this.tokenizedLine.push(0xa0);
+				}
+			}
+		}
+
+		// append terminal nodes
+		if (curs.currentNode().namedChildCount == 0) {
+			for (const c of curs.nodeText)
+				if (c.charCodeAt(0)<128)
+					this.tokenizedLine.push(c.charCodeAt(0));
+			return lxbase.WalkerOptions.gotoSibling;
+		}
+
+		return lxbase.WalkerOptions.gotoChild;
+	}
+	tokenizeLine() {
+		this.columns = 1;
+		this.tokenizedLine = new Array<number>();
+		const tree = this.parse(this.line, '\n');
+		this.walk(tree, this.visit.bind(this));
+		if (this.tokenizeLine.length > 126)
+			this.tokenizedLine = undefined;
+		if (this.tokenizedLine == undefined)
+			return;
+		for (let i = 0; i < this.tokenizedLine.length; i++) {
+			if (this.tokenizedLine[i] < 128 && this.tokenizedLine[i] != 32)
+				this.tokenizedLine[i] += 128;
+		}
+		this.tokenizedLine.push(0x8d);
+	}
+	tokenize(lines: string[], macros: Map<string, Array<labels.LabelNode>>): Array<number> | undefined {
+		this.GetProperties(lines);
+		this.tokenizedProgram = new Array<number>();
+		for (this.row=0;this.row<lines.length;this.row++)
+		{
+			if (lines[this.row].length == 0) {
+				this.tokenizedProgram.push(0x8d);
+				continue;
+			}
+			this.line = this.AdjustLine(lines, macros);
+			this.tokenizeLine();
+			if (!this.tokenizedLine)
+				return undefined;
+			this.tokenizedProgram = this.tokenizedProgram.concat(this.tokenizedLine);
+		}
+		return this.tokenizedProgram;
+	}
+	detokenize(img: number[]): string | undefined {
+		let addr = 0;
+		let line = "";
+		let code = "";
+		while (addr < img.length) {
+			if (img[addr] == 0x8d) {
+				line = formatTokens(line, "\u0100", this.widths);
+				code += line + "\n";
+				addr += 1;
+				line = "";
+			} else if (img[addr]==0xa0) {
+				line += "\u0100";
+				addr += 1;
+			} else if (img[addr]==32 || img[addr]==9) {
+				line += String.fromCharCode(img[addr]);
+				addr += 1;
+			} else if (img[addr] < 128) {
+				return undefined;
+			} else {
+				line += String.fromCharCode(img[addr]-128);
+				addr += 1;
+			}
+		}
+		if (line.length > 0) {
+			line = formatTokens(line, "\u0100", this.widths);
+			code += line + "\n";
+		}
+		return code;
+	}
+}
+
+export class DisassemblyTool extends lxbase.LangExtBase
+{
+	widths = [9, 6, 11];
 	disassemblyMap : Map<number,OpData>;
 	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings)
 	{
@@ -239,6 +397,15 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 					this.disassemblyMap.set(mode.code,{mnemonic:key,operand:operandStr ? operandStr:'0',xc:2,relative:rel,immediate:imm});
 			}
 		}
+		this.set_widths();
+	}
+	set_widths()
+	{
+		this.widths = [
+			this.config.columns.c1,
+			this.config.columns.c2,
+			this.config.columns.c3
+		]
 	}
 	encode_int16(int16: number) : string
 	{
@@ -293,6 +460,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		if (!addrRange)
 			return 'ERROR bad range passed to disassembler';
 		const accept_brk = this.config.disassembly.brk;
+		const off = params.imgOffset;
 		let addr = addrRange[0];
 		let code = '';
 		const addresses = new Array<number>();
@@ -304,8 +472,8 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		while (addr<addrRange[1])
 		{
 			addresses.push(addr);
-			const op = this.disassemblyMap.get(img[addr]);
-			if (op && params.xc>=op.xc && (img[addr]!=0 || accept_brk))
+			const op = this.disassemblyMap.get(img[addr-off]);
+			if (op && params.xc>=op.xc && (img[addr-off]!=0 || accept_brk))
 			{
 				instructions.push(op.mnemonic.toUpperCase());
 				addr += 1;
@@ -318,7 +486,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 					{
 						let val = 0;
 						for (let i=0;i<bytes;i++)
-							val += img[addr+i]*(256**i);
+							val += img[addr-off+i]*(256**i);
 						if (op.relative)
 							val = addr + bytes + (val<128 ? val : val-256);
 						if (!op.immediate)
@@ -338,8 +506,8 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 				}
 				if (moveOpMatch && addr+1<addrRange[1])
 				{
-					const hex1 = '$' + img[addr].toString(16).padStart(2,'0').toUpperCase();
-					const hex2 = '$' + img[addr+1].toString(16).padStart(2,'0').toUpperCase();
+					const hex1 = '$' + img[addr-off].toString(16).padStart(2,'0').toUpperCase();
+					const hex2 = '$' + img[addr-off+1].toString(16).padStart(2,'0').toUpperCase();
 					operands.push(op.operand.replace('11',hex1+','+hex2));
 					operand_vals.push(-1);
 					addr += 2;
@@ -348,7 +516,7 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 			else
 			{
 				instructions.push('DFB');
-				operands.push('$' + img[addr].toString(16).padStart(2,'0').toUpperCase());
+				operands.push('$' + img[addr-off].toString(16).padStart(2,'0').toUpperCase());
 				operand_vals.push(-1);
 				addr += 1;
 			}
@@ -363,14 +531,16 @@ export class DisassemblyTool extends lxbase.LangExtBase // do we need LangExtBas
 		}
 		for (let i=0;i<addresses.length;i++)
 		{
+			let line = '';
 			if (labels.has(addresses[i]))
-				code += '_'+addresses[i].toString(16).padStart(4,'0').toUpperCase();
-			code += '\t' + instructions[i];
+				line += '_'+addresses[i].toString(16).padStart(4,'0').toUpperCase();
+			line += '\t' + instructions[i];
 			if (labels.has(operand_vals[i]))
-				code += '\t' + operands[i].replace('$','_');
+				line += '\t' + operands[i].replace('$','_');
 			else if (operands[i].length>0)
-				code += '\t' + operands[i];
-			code += '\n';
+				line += '\t' + operands[i];
+			line = formatTokens(line, '\t', this.widths);
+			code += line + '\n';
 		}
 		return code;
 	}
