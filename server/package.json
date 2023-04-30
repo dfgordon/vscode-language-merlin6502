@@ -19,7 +19,8 @@
 		"vscode-languageserver-textdocument": "^1.0.4",
 		"vscode-uri": "^3.0.3",
 		"web-tree-sitter": "^0.20.7",
-		"yaml": "^2.0.1"
+		"yaml": "^2.0.1",
+		"@dfgordon/a2-memory-map": "^1.0.1"
 	},
 	"scripts": {}
 }

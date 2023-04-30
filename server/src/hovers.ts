@@ -38,22 +38,29 @@ export class TSHoverProvider extends lxbase.LangExtBase
 			return parseInt(num_str.substring(1),2);
 		return parseInt(num_str);
 	}
-	addr_hover(hover:Array<vsserv.MarkupContent>,curs:Parser.TreeCursor) : boolean
+	num_to_addr_hover(hover: Array<vsserv.MarkupContent>, num: number | undefined) : boolean
+	{
+		if (!num)
+			return false;
+		if (!isNaN(num))
+		{
+			if (num>=2**15)
+				num = num - 2**16;
+			const temp = this.addresses.get(num);
+			if (temp) {
+				for (let i = 0; i < temp.length; i++)
+					hover.push(temp[i]);
+				return true;
+			}
+		}
+		return false;
+	}
+	curs_to_addr_hover(hover:Array<vsserv.MarkupContent>,curs:Parser.TreeCursor) : boolean
 	{
 		if (curs.nodeType=="num")
 		{
-			let parsed = this.parse_merlin_number(curs.nodeText);
-			if (!isNaN(parsed))
-			{
-				if (parsed>=2**15)
-					parsed = parsed - 2**16;
-				const temp = this.addresses.get(parsed);
-				if (temp)
-				{
-					temp.forEach(s => hover.push(s));
-					return true;
-				}
-			}
+			const parsed = this.parse_merlin_number(curs.nodeText);
+			return this.num_to_addr_hover(hover,parsed)
 		}
 		return false;
 	}
@@ -63,7 +70,7 @@ export class TSHoverProvider extends lxbase.LangExtBase
 		if (lxbase.rangeContainsPos(this.range,this.position))
 		{
 			if (this.config.hovers.specialAddresses)
-				if (this.addr_hover(this.hover,curs))
+				if (this.curs_to_addr_hover(this.hover,curs))
 					return lxbase.WalkerOptions.exit;
 			if (this.config.hovers.mnemonics)
 			{
@@ -137,6 +144,8 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 				{
 					if (node.isDef)
 					{
+						if (this.config.hovers.specialAddresses)
+							this.num_to_addr_hover(this.hover,node.value);
 						const row = node.rng.start.line
 						let str = 'definition on line ' + (row+1);
 						if (this.currDoc && this.currDoc.uri == node.doc.uri)

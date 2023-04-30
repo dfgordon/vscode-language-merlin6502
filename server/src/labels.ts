@@ -50,8 +50,17 @@ export class LabelNode
     isDef: boolean;
 	isRef: boolean;
 	isSub: boolean;
+	value: number | undefined;
 	definedAnywhere: boolean;
 	children: ChildLabel[];
+	parse_merlin_number(num_str:string) : number
+	{
+		if (num_str[0]=='$')
+			return parseInt(num_str.substring(1),16);
+		if (num_str[0]=='%')
+			return parseInt(num_str.substring(1),2);
+		return parseInt(num_str);
+	}
 	constructor(doc: vsserv.TextDocumentItem, node: Parser.SyntaxNode, rng: vsserv.Range)
 	{
 		const next = node.nextNamedSibling;
@@ -61,6 +70,13 @@ export class LabelNode
 		this.isEntry = false;
 		this.isExternal = false;
 		this.isSub = false;
+		if (next?.type == "psop_equ") {
+			const valNode = next.nextNamedSibling?.firstNamedChild;
+			if (valNode?.type == "num")
+				this.value = this.parse_merlin_number(valNode.text);
+			if (this.value && isNaN(this.value))
+				this.value = undefined;
+		}
 		if (parent && parent.type == "arg_ent" || next && next.type == "psop_ent")
 			this.isEntry = true;
 		if (parent && parent.type == "arg_ext" || next && next.type == "psop_ext")

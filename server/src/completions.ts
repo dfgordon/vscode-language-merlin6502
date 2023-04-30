@@ -1,7 +1,7 @@
 import * as vsserv from 'vscode-languageserver';
 import * as vsdoc from 'vscode-languageserver-textdocument';
 import * as Parser from 'web-tree-sitter';
-import * as specialAddresses from './specialAddresses.json';
+import * as a2map from '@dfgordon/a2-memory-map';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
 import * as lxbase from './langExtBase';
@@ -25,21 +25,18 @@ export class AddressCompletionProvider
 	rebuild()
 	{
 		this.items = new Array<vsserv.CompletionItem>();
-		for (const addr of Object.keys(specialAddresses))
+		for (const [key,obj] of a2map.get_all())
 		{
-			const typ = Object(specialAddresses)[addr].type;
-			const ctx = Object(specialAddresses)[addr].ctx;
-			if (!this.config.completions.ibas && ctx && ctx=="Integer BASIC")
+			if (!this.config.completions.ibas && obj.ctx=="Integer BASIC")
 				continue;
-			if (!this.config.completions.abas && ctx && ctx=="Applesoft")
+			if (!this.config.completions.abas && obj.ctx=="Applesoft")
 				continue;
-			if (typ)
-				this.items.push(this.get_completion_item(addr,'',''));
+			if (obj.type)
+				this.items.push(this.get_completion_item(key,obj,'',''));
 		}
 	}
-	get_completion_item(addr: string,prefix: string,postfix: string) : vsserv.CompletionItem
+	get_completion_item(addr: string,addr_entry: a2map.AddressInfo,prefix: string,postfix: string) : vsserv.CompletionItem
 	{
-		const addr_entry = Object(specialAddresses)[addr];
 		let num_addr = parseInt(addr);
 		num_addr = num_addr<0 ? num_addr+2**16 : num_addr;
 		let addr_str = num_addr.toString(16);
@@ -306,8 +303,14 @@ export class codeCompletionProvider extends lxbase.LangExtBase
 		}
 		if (psop_args==0 && linePrefix.search(/^\S*\s+\S+\s+[#([<>|^]?[a-zA-Z]$/)>-1) // label in third column
 		{
-			for (const k of shared.globals.keys())
-				label.add(k);
+			const instruction_match = linePrefix.match(/^\S*\s+[pP][mM][cC]/);
+			if (instruction_match) {
+				for (const k of shared.macros.keys())
+					label.add(k)
+			} else {
+				for (const k of shared.globals.keys())
+					label.add(k);
+			}
 		}
 		if (linePrefix.search(/^\S*\s+\S+\s+[([]$/)>-1) // started an indirect indexed addressing mode
 		{
