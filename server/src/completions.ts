@@ -1,7 +1,7 @@
 import * as vsserv from 'vscode-languageserver';
 import * as vsdoc from 'vscode-languageserver-textdocument';
 import * as Parser from 'web-tree-sitter';
-import * as a2map from '@dfgordon/a2-memory-map';
+import * as a2map from 'a2-memory-map';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
 import * as lxbase from './langExtBase';

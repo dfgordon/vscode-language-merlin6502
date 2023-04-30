@@ -1,6 +1,6 @@
 import { assert } from 'console';
 import * as vsserv from 'vscode-languageserver/node';
-import * as a2map from '@dfgordon/a2-memory-map';
+import * as a2map from 'a2-memory-map';
 
 function MarkdownString(s: string): vsserv.MarkupContent
 {
