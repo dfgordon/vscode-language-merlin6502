@@ -403,7 +403,8 @@ async function getAllWorkspaceDocs() {
 		workspaceDocs = new Array<vsserv.TextDocumentItem>();
 		for (const folder of folders) {
 			const folderUri = vsuri.URI.parse(folder.uri);
-			const files = glob.sync(folderUri.path + '/**/*.S');
+			const globUri = vsuri.Utils.joinPath(folderUri, '**', '*.S');
+			const files = glob.sync(globUri.fsPath);
 			files.forEach(f => {
 				const fileUri = vsuri.URI.file(f);
 				const content: string = fs.readFileSync(f, { encoding: "utf8" });
