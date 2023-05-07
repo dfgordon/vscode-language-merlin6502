@@ -44,12 +44,11 @@ export class TSHoverProvider extends lxbase.LangExtBase
 			return false;
 		if (!isNaN(num))
 		{
-			if (num>=2**15)
-				num = num - 2**16;
 			const temp = this.addresses.get(num);
 			if (temp) {
 				for (let i = 0; i < temp.length; i++)
-					hover.push(temp[i]);
+					for (let j = 0; j < temp[i].length; j++)
+						hover.push(temp[i][j]);
 				return true;
 			}
 		}
@@ -63,6 +62,22 @@ export class TSHoverProvider extends lxbase.LangExtBase
 			return this.num_to_addr_hover(hover,parsed)
 		}
 		return false;
+	}
+	append_doc_str(doc: vsserv.TextDocumentItem, rng: vsserv.Range) {
+		const lines = doc.text.split(/\r?\n/);
+		let count = 0;
+		for (let i = rng.start.line - 1; i >= 0; i--) {
+			if (lines[i].charAt(0) == "*")
+				count++;
+			else
+				break;
+		}
+		let docString = "";
+		for (let i = rng.start.line - count; i < rng.start.line; i++) {
+			docString += lines[i].substring(1) + "\n";
+		}
+		if (docString.length > 0)
+			this.hover.push(MarkdownString(docString));
 	}
 	get_hover(curs:Parser.TreeCursor) : lxbase.WalkerChoice
 	{
@@ -149,13 +164,18 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 						const row = node.rng.start.line
 						let str = 'definition on line ' + (row+1);
 						if (this.currDoc && this.currDoc.uri == node.doc.uri)
-							str += '\n```\n' + this.currDoc.text.split('\n')[row] + '\n```';
+						{
+							str += '\n```\n' + this.currDoc.text.split(/\r?\n/)[row] + '\n```';
+							this.hover.push(MarkdownString(str));
+							this.append_doc_str(this.currDoc, node.rng);
+						}
 						else
 						{
 							str += '\n\nof ' + lxbase.relativeToWorkspace(this.labelSentry.workspaceFolders,node.doc.uri);
-							str += '\n```\n' + node.doc.text.split('\n')[row] + '\n```';
+							str += '\n```\n' + node.doc.text.split(/\r?\n/)[row] + '\n```';
+							this.hover.push(MarkdownString(str));
+							this.append_doc_str(node.doc, node.rng);
 						}
-						this.hover.push(MarkdownString(str));
 					}
 				}
 				return lxbase.WalkerOptions.exit;
@@ -186,12 +206,12 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 						if (node.doc) {
 							if (node.doc == this.currDoc)
 								this.hover.push(MarkdownString('entry found on line ' + (row + 1) +
-									'\n```\n' + node.doc.text.split('\n')[row] + '\n```'));
+									'\n```\n' + node.doc.text.split(/\r?\n/)[row] + '\n```'));
 							else
 								this.hover.push(MarkdownString('entry found in file\n\n' +
 									lxbase.relativeToWorkspace(this.labelSentry.workspaceFolders, node.doc.uri) +
 									'\n\non line ' + (row + 1) +
-									'\n```\n' + node.doc.text.split('\n')[row] + '\n```'));
+									'\n```\n' + node.doc.text.split(/\r?\n/)[row] + '\n```'));
 						}
 					}
 				}
@@ -208,7 +228,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 		const test = this.labelSentry.shared.get(document.uri);
 		if (!test)
 			return undefined;
-		this.lines = document.getText().split('\n');
+		this.lines = document.getText().split(/\r?\n/);
 		this.labelSet = test; 
 		this.currDoc = this.labelSentry.currMain;
 		if (!this.currDoc)

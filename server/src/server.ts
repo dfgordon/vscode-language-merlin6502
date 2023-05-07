@@ -379,7 +379,7 @@ connection.onDocumentRangeFormatting((params: vsserv.DocumentRangeFormattingPara
 	const labelSet = labels.shared.get(params.textDocument.uri);
 	if (!doc || !labelSet)
 		return [];
-	return formatter.formatRange(doc.getText().split('\n'), params.range, labelSet.macros);
+	return formatter.formatRange(doc.getText().split(/\r?\n/), params.range, labelSet.macros);
 });
 
 connection.onDocumentOnTypeFormatting((params: vsserv.DocumentOnTypeFormattingParams): vsserv.TextEdit[] => {
@@ -387,7 +387,7 @@ connection.onDocumentOnTypeFormatting((params: vsserv.DocumentOnTypeFormattingPa
 	const labelSet = labels.shared.get(params.textDocument.uri);
 	if (!doc || !labelSet)
 		return [];
-	return formatter.formatTyping(doc.getText().split('\n'), params.position, params.ch, labelSet.macros);
+	return formatter.formatTyping(doc.getText().split(/\r?\n/), params.position, params.ch, labelSet.macros);
 });
 
 // Document Analysis

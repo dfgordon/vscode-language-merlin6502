@@ -317,7 +317,7 @@ export class TSDiagnosticProvider extends lxbase.LangExtBase
 		this.diag = new Array<vsserv.Diagnostic>();
 		if (document && document.languageId=='merlin6502')
 		{
-			const lines = document.getText().split('\n');
+			const lines = document.getText().split(/\r?\n/);
 			this.reset();
 			this.GetProperties(lines);
 			if (this.interpretation=='source')

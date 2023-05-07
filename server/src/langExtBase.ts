@@ -56,7 +56,7 @@ export function rangeContainsRange(outer: vsserv.Range, inner: vsserv.Range) : b
 	return true;
 }
 
-export function translatePos(pos: vsserv.Position,dl: number,dc: number) {
+export function translatePos(pos: vsserv.Position,dl: number,dc: number): vsserv.Position {
 	return vsserv.Position.create(
 		pos.line + dl < 0 ? 0 : pos.line + dl,
 		pos.character + dc < 0 ? 0 : pos.character + dc

@@ -53,7 +53,7 @@ export class FormattingTool
 			{
 				command: 'merlin6502.pasteFormat',
 				arguments: [
-					verified.doc.getText().split('\n'),
+					verified.doc.getText().split(/\r?\n/),
 					verified.doc.uri.toString()
 				]
 			});

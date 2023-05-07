@@ -104,7 +104,7 @@ export class TokenProvider extends lxbase.LangExtBase
 		let macros = this.labelSentry.shared.get(document.uri)?.macros;
 		if (!macros)
 			macros = new Map<string,labels.LabelNode[]>();
-		const lines = document.getText().split('\n');
+		const lines = document.getText().split(/\r?\n/);
 		this.tokensBuilder = new vsserv.SemanticTokensBuilder();
 		this.GetProperties(lines);
 		if (this.interpretation=='linker')
@@ -122,7 +122,7 @@ export class TokenProvider extends lxbase.LangExtBase
 		let macros = this.labelSentry.shared.get(document.uri)?.macros;
 		if (!macros)
 			macros = new Map<string,labels.LabelNode[]>();
-		const lines = document.getText().split('\n');
+		const lines = document.getText().split(/\r?\n/);
 		this.tokensBuilder = new vsserv.SemanticTokensBuilder();
 		this.GetProperties(lines);
 		if (this.interpretation=='linker')

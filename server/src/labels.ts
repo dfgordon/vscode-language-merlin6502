@@ -304,7 +304,7 @@ export class LabelSentry extends lxbase.LangExtBase
 	}
 	build_main(document: vsdoc.TextDocument)
 	{
-		const lines = document.getText().split('\n');
+		const lines = document.getText().split(/\r?\n/);
 		this.GetProperties(lines);
 		this.labels = new LabelSet();
 		this.running = new Set<string>();
@@ -323,7 +323,7 @@ export class LabelSentry extends lxbase.LangExtBase
 	}
 	verify_main(document: vsdoc.TextDocument)
 	{
-		const lines = document.getText().split('\n');
+		const lines = document.getText().split(/\r?\n/);
 		this.running = new Set<string>();
 		this.currDoc = this.currMain;
 		this.currScopeName = '';
@@ -352,7 +352,7 @@ export class LabelSentry extends lxbase.LangExtBase
 			const docName = path.basename(doc.uri, '.S');
 			if (docName==fileName)
 			{
-				const lines = doc.text.split('\n');
+				const lines = doc.text.split(/\r?\n/);
 				matches++;
 				if (matches==1)
 				{
@@ -409,7 +409,7 @@ export class LabelSentry extends lxbase.LangExtBase
 		for (const doc of this.workspaceDocs)
 		{
 			this.currModule = doc;
-			const lines = doc.text.split('\n');
+			const lines = doc.text.split(/\r?\n/);
 			for (this.row=0;this.row<lines.length;this.row++)
 			{
 				if (lines[this.row].search(/^\S*\s+ENT/i)==-1)

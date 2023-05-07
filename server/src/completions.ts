@@ -268,7 +268,7 @@ export class codeCompletionProvider extends lxbase.LangExtBase
 		const linePrefix = document.getText(vsserv.Range.create(position.line,0,position.line,position.character));
 		if (linePrefix.charAt(0)=='*')
 			return [];
-		this.GetProperties(document.getText().split('\n'));
+		this.GetProperties(document.getText().split(/\r?\n/));
 		if (linePrefix.search(/^\S*\s+[A-Za-z]$/)>-1) // start of opcode column?
 		{
 			for (const k of Object.keys(opcodes))

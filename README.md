@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest features*: improved address database, hovers resolve equates
+*latest update*: include docstrings in hovers, patches to LF/CRLF handling
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
@@ -43,7 +43,9 @@ Merlin labels are case sensitive, while instruction and pseudo-instruction mnemo
 
 ## Working with Labels
 
-You can use `Go to Declaration`, `Go to Definition`, `Go to References`, and `Rename Symbol` to find and manipulate labels.  You can also jump to labels using `Ctrl+O` (symbol in document), or `Ctrl+t` (entry labels throughout workspace).  Renaming is scoped to a document and its `PUT` and `USE` includes. 
+You can use `Go to Declaration`, `Go to Definition`, `Go to References`, and `Rename Symbol` to find and manipulate labels.  You can also jump to labels using `Ctrl+O` (symbol in document), or `Ctrl+t` (entry labels throughout workspace).  Renaming is scoped to a document and its `PUT` and `USE` includes.
+
+Headings (`*` comments) placed on lines immediately before a label definition are considered docstrings and become part of the hover for that label.  Markdown can be used in the docstrings.
 
 ## Apple ][ Special Addresses
 
