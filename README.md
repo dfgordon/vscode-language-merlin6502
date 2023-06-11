@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest update*: include docstrings in hovers, patches to LF/CRLF handling
+*latest update*: disassembler accepts wider inputs, dependency updates, CI runs on 3 platforms 
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
