@@ -44,11 +44,5 @@
 			"outFiles": ["${workspaceRoot}/server/out/test/**/*.js"],
 			"preLaunchTask": "npm: test-compile"
 		}
-	],
-	"compounds": [
-		{
-			"name": "Client + Server",
-			"configurations": ["Launch Client", "Attach to Server"]
-		}
 	]
 }

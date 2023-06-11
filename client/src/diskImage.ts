@@ -60,18 +60,26 @@ class FileImage {
 	 * @returns array of numbers if data is sequential, undefined otherwise
 	 */
 	sequence(): number[] | undefined {
-		const sorted = new Map(Object.entries(this.img.chunks).sort());
+		const sorted = new Map(Object.entries(this.img.chunks).sort((a, b) => {
+			return parseInt(a[0]) - parseInt(b[0])
+		}));
 		const ans = new Array<number>();
 		let idx = 0;
 		for (const [key, value] of sorted) {
-			if (idx != parseInt(key))
+			if (idx != parseInt(key)) {
+				console.log("expected chunk "+idx+" got "+key)
 				return;
-			if (value.length % 2 == 1)
+			}
+			if (value.length % 2 == 1) {
+				console.log("length of hex string was odd");
 				return;
+			}
 			for (let i = 0; i < value.length / 2; i++) {
 				const byteValue = parseInt(value.slice(i * 2, i * 2 + 2), 16);
-				if (isNaN(byteValue))
+				if (isNaN(byteValue)) {
+					console.log("hex string parsed as NaN");
 					return;
+				}
 				ans.push(byteValue);
 			}
 			idx++;
@@ -87,7 +95,7 @@ class FileImage {
 		if (!seq)
 			return;
 		if (this.img.file_system == "a2 dos") {
-			if (this.img.fs_type != "04")
+			if (this.img.fs_type != "04" && this.img.fs_type != "84")
 				return;
 			if (seq.length < 4)
 				return;
@@ -98,7 +106,7 @@ class FileImage {
 			return [loadAddr, seq.slice(4, 4 + eof)];
 		}
 		if (this.img.file_system == "prodos") {
-			if (this.img.fs_type != "06")
+			if (this.img.fs_type != "06" && this.img.fs_type != "FF" && this.img.fs_type != "ff")
 				return;
 			const aux = this.img.aux;
 			if (aux.length < 4)
@@ -108,11 +116,12 @@ class FileImage {
 			if (eofs.length < 6)
 				return;
 			const eof = parseInt(eofs.slice(0, 2), 16) + 256 * parseInt(eofs.slice(2, 4), 16) + 256 * 256 * parseInt(eofs.slice(4, 6), 16);
-			if (seq.length < eof)
-				return;
 			if (isNaN(loadAddr))
 				return;
-			return [loadAddr, seq.slice(0, eof)];
+			if (eof < seq.length)
+				return [loadAddr, seq.slice(0, eof)];
+			else
+				return [loadAddr, seq];
 		}
 		return undefined;
 	}
@@ -222,6 +231,9 @@ export class A2KitTool
 				if (line.length>20 && line.substring(17,20) == "BIN") {
 					files.push("(BIN)  "+line.slice(1,15).trim());
 				}
+				if (line.length>20 && line.substring(17,20) == "SYS") {
+					files.push("(SYS)  "+line.slice(1,15).trim());
+				}
 			}
 			return [dirs, files];
 		}
@@ -300,7 +312,6 @@ export class A2KitTool
 		if (this.operation == "get" && typ == "txt") {
 			this.a2kit_txt2bin(["get", "-d", this.fsPath, "-f", this.imgPath[this.imgPath.length - 1], "-t", "mtok"], this.detokenize.bind(this), undefined);
 		} else if (this.operation == "get" && typ == "bin") {
-			// TODO: get the file image so we can know the load address; need a file image processing layer
 			this.a2kit_bin2txt(["get", "-d", this.fsPath, "-f", this.imgPath[this.imgPath.length - 1], "-t", "any"], this.disassemble.bind(this), undefined);
 		} else if (this.operation == "put") {
 			let existingFilesPrompt = "existing files: ";
@@ -373,6 +384,9 @@ export class A2KitTool
 			this.imgPath.push(this.imgPath[this.imgPath.length - 1] + fname.substring(7));
 			this.runOperation("txt");
 		} else if (fname && fname.substring(0, 7) == "(BIN)  ") {
+			this.imgPath.push(this.imgPath[this.imgPath.length - 1] + fname.substring(7));
+			this.runOperation("bin");
+		} else if (fname && fname.substring(0, 7) == "(SYS)  ") {
 			this.imgPath.push(this.imgPath[this.imgPath.length - 1] + fname.substring(7));
 			this.runOperation("bin");
 		} else if (!fname) {

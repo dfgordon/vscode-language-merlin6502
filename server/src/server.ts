@@ -11,7 +11,7 @@ import * as Parser from 'web-tree-sitter';
 import { defaultSettings } from './settings';
 import * as vsuri from 'vscode-uri';
 import * as fs from 'fs';
-import { glob } from 'glob';
+import { globSync } from 'glob';
 
 let globalSettings = defaultSettings;
 let TSInitResult: [Parser, Parser.Language];
@@ -404,7 +404,9 @@ async function getAllWorkspaceDocs() {
 		for (const folder of folders) {
 			const folderUri = vsuri.URI.parse(folder.uri);
 			const globUri = vsuri.Utils.joinPath(folderUri, '**', '*.S');
-			const files = glob.sync(globUri.fsPath);
+			// TODO: reconcile the uri library with glob, in particular, glob wants us to
+			// always use the forward slash (so they can escape `*` and `?`)
+			const files = globSync(globUri.fsPath,{windowsPathsNoEscape: true});
 			files.forEach(f => {
 				const fileUri = vsuri.URI.file(f);
 				const content: string = fs.readFileSync(f, { encoding: "utf8" });

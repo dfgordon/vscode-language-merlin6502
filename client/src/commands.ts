@@ -150,6 +150,7 @@ export class DisassemblyTool
 			vscode.window.showErrorMessage('Could not find aux memory keys in YAML file');
 			return;
 		}
+		// n.b. if AppleWin ever changes the format of the keys we may need to provide sorting function
 		const mainMemList = (Object.entries(block64Map) as [string,string][]).sort();
 		const auxMemList = (Object.entries(block64MapAux) as [string,string][]).sort();
 		return [mainMemList,auxMemList];
