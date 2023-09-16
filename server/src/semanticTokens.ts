@@ -27,9 +27,9 @@ export class TokenProvider extends lxbase.LangExtBase
 	labelSentry: labels.LabelSentry;
 	tokensBuilder : vsserv.SemanticTokensBuilder = new vsserv.SemanticTokensBuilder();
 
-	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings, sentry: labels.LabelSentry)
+	constructor(TSInitResult : [Parser,Parser.Language], logger: lxbase.Logger, settings: merlin6502Settings, sentry: labels.LabelSentry)
 	{
-		super(TSInitResult,settings);
+		super(TSInitResult,logger,settings);
 		this.labelSentry = sentry;
 	}
 	process_node(curs: Parser.TreeCursor): lxbase.WalkerChoice
@@ -112,7 +112,7 @@ export class TokenProvider extends lxbase.LangExtBase
 		for (this.row=range.start.line;this.row<=range.end.line;this.row++)
 		{
 			const tree = this.parse(this.AdjustLine(lines,macros),"\n");
-			this.walk(tree,this.process_node.bind(this));
+			this.walk(tree,this.process_node.bind(this),undefined);
 		}
 		return this.tokensBuilder.build();
 	}
@@ -130,7 +130,7 @@ export class TokenProvider extends lxbase.LangExtBase
 		for (this.row=0;this.row<lines.length;this.row++)
 		{
 			const tree = this.parse(this.AdjustLine(lines,macros),"\n");
-			this.walk(tree,this.process_node.bind(this));
+			this.walk(tree,this.process_node.bind(this),undefined);
 		}
 		return this.tokensBuilder.build();
 	}

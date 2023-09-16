@@ -146,6 +146,10 @@
 			{
 				"command": "merlin6502.saveToDiskImage",
 				"title": "merlin6502: Save to disk image"
+			},
+			{
+				"command": "merlin6502.selectMaster",
+				"title": "merlin6502: Select master file"
 			}
 		],
 		"menus": {
@@ -172,6 +176,10 @@
 				},
 				{
 					"command": "merlin6502.saveToDiskImage",
+					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.selectMaster",
 					"when": "editorLangId == merlin6502"
 				}
 			]

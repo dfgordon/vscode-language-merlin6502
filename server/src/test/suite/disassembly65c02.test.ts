@@ -5,7 +5,7 @@ import * as assert from 'assert';
 
 async function testDisassembler(hexInput: string, expectedCode: string) {
     const TSInitResult = await lxbase.TreeSitterInit();
-    const tool = new com.DisassemblyTool(TSInitResult, config.defaultSettings);
+    const tool = new com.DisassemblyTool(TSInitResult, console, config.defaultSettings);
     const binary = Buffer.from(hexInput, "hex");
     const actualCode = tool.disassemble(Array.from(binary), {
         getWhat: 'Disassembly: Ranged',

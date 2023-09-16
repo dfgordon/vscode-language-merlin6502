@@ -5,18 +5,17 @@ import * as comm from './commands';
 import * as hov from './hovers';
 import * as compl from './completions';
 import * as tok from './semanticTokens';
+import { MerlinContext } from './workspace';
 import {LabelSentry, LabelNode, LabelSet} from './labels';
 import * as lxbase from './langExtBase';
 import * as Parser from 'web-tree-sitter';
 import { defaultSettings } from './settings';
-import * as vsuri from 'vscode-uri';
-import * as fs from 'fs';
-import { globSync } from 'glob';
+import * as path from 'path';
 
 let globalSettings = defaultSettings;
 let TSInitResult: [Parser, Parser.Language];
-let diagnosticTool: diag.TSDiagnosticProvider;
-let hoverTool: hov.TSHoverProvider;
+let diagnosticTool: diag.DiagnosticProvider;
+let hoverTool: hov.HoverProvider;
 let codeTool: compl.codeCompletionProvider;
 let addressTool: compl.AddressCompletionProvider;
 let disassembler: comm.DisassemblyTool;
@@ -24,14 +23,16 @@ let formatter: comm.FormattingTool;
 let tokenizer: comm.Tokenizer;
 let tokens: tok.TokenProvider;
 let labels: LabelSentry;
+let context: MerlinContext;
+let diagnosticSet: diag.DiagnosticSet;
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 const connection = vsserv.createConnection(vsserv.ProposedFeatures.all);
+const logger: lxbase.Logger = connection.console;
 
 // Create a simple text document manager.
 const windowDocs = new vsserv.TextDocuments(vsdoc.TextDocument);
-let workspaceDocs = new Array<vsserv.TextDocumentItem>();
 
 async function startServer()
 {
@@ -39,15 +40,18 @@ async function startServer()
 	connection.listen();
 	TSInitResult = await lxbase.TreeSitterInit();
 	globalSettings = await connection.workspace.getConfiguration('merlin6502');
-	labels = new LabelSentry(TSInitResult, globalSettings); // create labels first
-	diagnosticTool = new diag.TSDiagnosticProvider(TSInitResult, globalSettings, labels);
-	hoverTool = new hov.TSHoverProvider(TSInitResult, globalSettings, labels);
-	codeTool = new compl.codeCompletionProvider(TSInitResult, globalSettings, labels);
+	diagnosticSet = new diag.DiagnosticSet;
+	context = new MerlinContext(TSInitResult, logger, globalSettings);
+	labels = new LabelSentry(context, diagnosticSet);
+	diagnosticTool = new diag.DiagnosticProvider(labels);
+	hoverTool = new hov.HoverProvider(TSInitResult, logger, globalSettings, labels);
+	codeTool = new compl.codeCompletionProvider(TSInitResult, logger, globalSettings, labels);
 	addressTool = new compl.AddressCompletionProvider(globalSettings);
-	disassembler = new comm.DisassemblyTool(TSInitResult, globalSettings);
-	formatter = new comm.FormattingTool(TSInitResult, globalSettings, labels);
-	tokenizer = new comm.Tokenizer(TSInitResult, globalSettings, labels);
-	tokens = new tok.TokenProvider(TSInitResult, globalSettings, labels);
+	disassembler = new comm.DisassemblyTool(TSInitResult, logger, globalSettings);
+	formatter = new comm.FormattingTool(TSInitResult, logger, globalSettings, labels);
+	tokenizer = new comm.Tokenizer(TSInitResult, logger, globalSettings, labels);
+	tokens = new tok.TokenProvider(TSInitResult, logger, globalSettings, labels);
+	logger.log("finished constructing server objects");
 }
 
 let hasConfigurationCapability = false;
@@ -107,7 +111,7 @@ connection.onInitialized(() => {
 	}
 	if (hasWorkspaceFolderCapability) {
 		connection.workspace.onDidChangeWorkspaceFolders(() => {
-			connection.console.log('Workspace folder change event received, but not handled.');
+			logger.log('Workspace folder change event received, but not handled.');
 		});
 	}
 });
@@ -115,7 +119,6 @@ connection.onInitialized(() => {
 connection.onDidChangeConfiguration(() => {
 	connection.workspace.getConfiguration('merlin6502').then(settings => {
 		globalSettings = settings;
-		diagnosticTool.configure(globalSettings);
 		hoverTool.configure(globalSettings);
 		codeTool.configure(globalSettings);
 		addressTool.configure(globalSettings);
@@ -123,10 +126,9 @@ connection.onDidChangeConfiguration(() => {
 		formatter.configure(globalSettings);
 		tokenizer.configure(globalSettings);
 		tokens.configure(globalSettings);
-		labels.configure(globalSettings);
 	}).then(() => {
 		windowDocs.all().forEach(doc => {
-			validateTextDocument(doc);
+			validateTextDocument(vsserv.TextDocumentItem.create(doc.uri,'merlin6502',doc.version,doc.getText()));
 		});
 	});
 });
@@ -236,7 +238,7 @@ function documentSymbolFromMap(map: Map<string, LabelNode[]>, kind: vsserv.Symbo
 }
 
 connection.onWorkspaceSymbol(() => {
-	return workspaceSymbolFromMap(labels.entries, vsserv.SymbolKind.Constant);
+	return workspaceSymbolFromMap(context.entries, vsserv.SymbolKind.Constant);
 });
 
 connection.onDocumentSymbol(async params => {
@@ -372,6 +374,63 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 		if (params.arguments)
 			return tokenizer.detokenize(params.arguments);
 	}
+	else if (params.command == 'merlin6502.getIndicators') {
+		// TODO: get interpretation from something mapped by document
+		if (params.arguments) {
+			//logger.log("looping to find " + params.arguments[0]);
+			for (const doc of context.docs) {
+				if (doc.uri == params.arguments[0]) {
+					const docItem = vsserv.TextDocumentItem.create(doc.uri, 'merlin6502', doc.version, doc.text);
+					let master = context.get_master(docItem);
+					let needs_analysis = false;
+					if (context.stack.doc.length == 0) {
+						needs_analysis = true;
+					} else {
+						needs_analysis = master.uri != context.stack.doc[0].uri;
+					}
+					if (!needs_analysis) {
+						logger.log("reusing context " + master.uri);
+						return [context.interpretation, path.basename(master.uri, ".S")]
+					}
+					logger.log("analyzing " + doc.uri);
+					validateTextDocument(doc);
+					return [context.interpretation, path.basename(master.uri, ".S")]
+				}
+			}
+			return [context.interpretation, "master"];
+		}
+		return ["err", "err"];
+	}
+	else if (params.command == 'merlin6502.getMasterList') {
+		if (params.arguments) {
+			let ans = new Array<string>();
+			const includeKey = path.basename(params.arguments[0], ".S");
+			const putSet = context.put_map.get(includeKey);
+			if (putSet)
+				for (const master of putSet)
+					ans.push(master);
+			const useSet = context.use_map.get(includeKey);
+			if (useSet)
+				for (const master of useSet)
+					ans.push(master);
+			if (ans.length == 0)
+				return undefined;
+			return ans;
+		}
+		return undefined;
+	}
+	else if (params.command == 'merlin6502.selectMaster') {
+		if (params.arguments) {
+			context.preferred_master = params.arguments[0];
+			for (const doc of context.docs) {
+				if (doc.uri == context.preferred_master) {
+					('rescanning after master selection');
+					await getAllWorkspaceDocs();
+					validateTextDocument(doc);
+				}
+			}
+		}
+	}
 });
 
 connection.onDocumentRangeFormatting((params: vsserv.DocumentRangeFormattingParams): vsserv.TextEdit[] => {
@@ -400,58 +459,36 @@ async function waitForInit() {
 async function getAllWorkspaceDocs() {
 	const folders = await connection.workspace.getWorkspaceFolders();
 	if (folders) {
-		workspaceDocs = new Array<vsserv.TextDocumentItem>();
-		for (const folder of folders) {
-			const folderUri = vsuri.URI.parse(folder.uri);
-			const globUri = vsuri.Utils.joinPath(folderUri, '**', '*.S');
-			// TODO: reconcile the uri library with glob, in particular, glob wants us to
-			// always use the forward slash (so they can escape `*` and `?`)
-			const files = globSync(globUri.fsPath,{windowsPathsNoEscape: true});
-			files.forEach(f => {
-				const fileUri = vsuri.URI.file(f);
-				const content: string = fs.readFileSync(f, { encoding: "utf8" });
-				workspaceDocs.push(vsserv.TextDocumentItem.create(fileUri.toString(), 'merlin6502', 0, content));
-			});
-		}
-		labels.workspaceFolders = folders;
-		updateWorkspaceDocs();
-		labels.scan_entries(workspaceDocs);
-	}
-}
-
-function updateWorkspaceDocs() {
-	// this should be an inexpensive set of pointer updates
-	for (const doc of workspaceDocs) {
-		const winDoc = windowDocs.get(doc.uri);
-		if (winDoc) {
-			doc.text = winDoc.getText();
-			doc.version = winDoc.version;
-		}
+		context.gather_docs(folders);
+		context.updateWorkspaceDocs(windowDocs);
+		context.scan_entries_and_includes();
+		//logger.log("finished workspace scan");
 	}
 }
 
 windowDocs.onDidOpen(async params => {
 	await waitForInit();
 	await getAllWorkspaceDocs();
-	validateTextDocument(params.document);
+	const doc = params.document;
+	validateTextDocument(vsserv.TextDocumentItem.create(doc.uri,'merlin6502',doc.version,doc.getText()));
 });
 
 windowDocs.onDidSave(async listener => {
 	await waitForInit();
 	await getAllWorkspaceDocs();
-	validateTextDocument(listener.document);
+	const doc = listener.document;
+	validateTextDocument(vsserv.TextDocumentItem.create(doc.uri,'merlin6502',doc.version,doc.getText()));
 });
 
 windowDocs.onDidChangeContent(async change => {
 	await waitForInit();
-	if (labels.rescan_entries) {
+	if (context.rescan_entries) {
 		await getAllWorkspaceDocs();
 	} else {
-		updateWorkspaceDocs();
+		context.updateWorkspaceDocs(windowDocs);
 	}
-	for (const doc of windowDocs.all()) {
-		const included = labels.shared.get(doc.uri)?.includedDocs.has(change.document.uri);
-		if (doc.uri == change.document.uri || included)
+	for (const doc of context.docs) {
+		if (doc.uri == change.document.uri)
 			validateTextDocument(doc);
 	}
 });
@@ -463,11 +500,21 @@ windowDocs.onDidClose(async params => {
 	await getAllWorkspaceDocs();
 });
 
-async function validateTextDocument(textDocument: vsdoc.TextDocument): Promise<void> {
+async function validateTextDocument(textDocument: vsserv.TextDocumentItem): Promise<void> {
 	await waitForInit();
-	const diagnostics = diagnosticTool.update(textDocument);
-	connection.sendNotification(new vsserv.NotificationType<string>('merlin6502.interpretation'), diagnosticTool.interpretation);
-	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+	const diagnosticSet = diagnosticTool.update(textDocument);
+	for (const uri of diagnosticSet.map.keys()) {
+		labels.attach(uri);
+	}
+	connection.sendNotification(new vsserv.NotificationType<string>('merlin6502.interpretation'), context.interpretation);
+	if (context.stack.doc.length > 0) {
+		const currMaster = path.basename(context.stack.doc[0].uri, ".S");
+		connection.sendNotification(new vsserv.NotificationType<string>('merlin6502.context'), currMaster);
+	}
+	for (const [uri, diagnostics] of diagnosticSet.map) {
+		//logger.log("send diagnostics for " + uri);
+		connection.sendDiagnostics({ uri, diagnostics });
+	}
 }
 
 startServer();

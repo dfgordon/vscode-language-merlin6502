@@ -105,9 +105,9 @@ export class codeCompletionProvider extends lxbase.LangExtBase
 		'accum': '',
 		's': ''
 	});
-	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings, sentry: labels.LabelSentry)
+	constructor(TSInitResult : [Parser,Parser.Language], logger: lxbase.Logger, settings: merlin6502Settings, sentry: labels.LabelSentry)
 	{
-		super(TSInitResult,settings);
+		super(TSInitResult,logger,settings);
 		this.labelSentry = sentry;
 	}
 	modify(s:string,padreq:number)

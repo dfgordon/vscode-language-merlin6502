@@ -6,11 +6,6 @@ import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
 import { LabelNode } from './labels';
 
-export function relativeToWorkspace(dirs: vsserv.WorkspaceFolder[], uri: string) : string {
-	const base = dirs.length > 0 ? dirs[0].uri : undefined;
-	return base ? uri.replace(base, '').substring(1) : uri;
-}
-
 export function curs_to_range(curs: Parser.TreeCursor, rowOffset: number, colOffset: number): vsserv.Range
 {
 	const coff1 = curs.startPosition.column + colOffset < 0 ? 0 : colOffset;
@@ -72,12 +67,15 @@ export function rangeUnion(r1: vsserv.Range, r2: vsserv.Range): vsserv.Range {
 	)
 }
 
+export type Logger = vsserv.RemoteConsole & vsserv._ | Console;
+
 export const WalkerOptions = {
 	gotoChild: 0,
 	gotoSibling: 1,
 	gotoParentSibling: 2,
 	exit: 3,
-	abort: 4
+	abort: 4,
+	gotoInclude: 5
 } as const;
 
 export type WalkerChoice = typeof WalkerOptions[keyof typeof WalkerOptions];
@@ -104,6 +102,7 @@ export async function TreeSitterInit(): Promise<[Parser,Parser.Language]>
 
 export class LangExtBase
 {
+	logger: Logger;
 	parser : Parser;
 	Merlin6502 : Parser.Language;
 	config = defaultSettings;
@@ -119,8 +118,9 @@ export class LangExtBase
 	interpretation = 'source';
 	foundNode : Parser.SyntaxNode | null = null;
 	searchPos = vsserv.Position.create(0,0);
-	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings)
+	constructor(TSInitResult : [Parser,Parser.Language], connection: Logger, settings: merlin6502Settings)
 	{
+		this.logger = connection;
 		this.parser = TSInitResult[0];
 		this.Merlin6502 = TSInitResult[1];
 		this.opExactPattern = /ADC/;
@@ -192,13 +192,25 @@ export class LangExtBase
 	{
 		return this.parser.parse(txt+append);
 	}
-	walk(syntaxTree: Parser.Tree,visit: (node: Parser.TreeCursor) => WalkerChoice) : WalkerChoice
+	/**
+	 * Walk a syntax tree with provision for includes, usually applied line by line
+	 * @param syntaxTree result of Tree-sitter parser's analysis of the code
+	 * @param visit visitor to take some action given the current `TreeCursor`, returns `WalkerChoice` to guide the next visit
+	 * @param descend Function to call if the visitor wants to go inside an include, argument is the cursor position that induced the descent.
+	 *   Can be undefined, in which case a request to go inside is translated into a request to go to the next sibling.
+	 * @returns `WalkerChoice` enum, should be either `WalkerOptions.exit` or `WalkerOptions.abort`
+	 */
+	walk(syntaxTree: Parser.Tree,visit: (node: Parser.TreeCursor) => WalkerChoice, descend: undefined | ((node: Parser.TreeCursor) => WalkerChoice)) : WalkerChoice
 	{
 		const curs = syntaxTree.walk();
 		let choice : WalkerChoice = WalkerOptions.gotoChild;
 		do
 		{
-			if (choice==WalkerOptions.gotoChild && curs.gotoFirstChild())
+			if (choice == WalkerOptions.gotoInclude && descend)
+				choice = descend(curs);
+			else if (choice == WalkerOptions.gotoInclude && !descend)
+				choice = WalkerOptions.gotoSibling;
+			else if (choice==WalkerOptions.gotoChild && curs.gotoFirstChild())
 				choice = visit(curs);
 			else if (choice==WalkerOptions.gotoParentSibling && curs.gotoParent() && curs.gotoNextSibling())
 				choice = visit(curs);
@@ -240,7 +252,7 @@ export class LangExtBase
 		{
 			const programLine = lines[row];
 			const tree = this.parse(programLine,"\n");
-			this.walk(tree,this.visit_properties.bind(this));
+			this.walk(tree,this.visit_properties.bind(this),undefined);
 			if (row>50)
 				break; // don't waste time in large files
 		}
@@ -266,14 +278,17 @@ export class LangExtBase
 		this.foundNode = null;
 		this.searchPos = position;
 		const tree = this.parse(this.AdjustLine(lines,macros),"\n");
-		this.walk(tree,this.visit_find.bind(this));
+		this.walk(tree,this.visit_find.bind(this),undefined);
 		return this.foundNode;
 	}
-	/// AdjustLine is used to let the parser know when an item
-	/// in the operator column is a previously defined macro name.
-	/// The signal is unicode 0x100 at the start of the line.
-	/// GetLabels must be called before the first line is processed.
-	AdjustLine(lines: string[], macros: Map<string,LabelNode[]>) : string
+	/**
+	 * Look for match to a previously defined macro in column 2.
+	 * If there is a match insert unicode 0x100 at start of line.  This forces intepretation as an implicit macro call.
+	 * This is needed to emulate Merlin's contextual parsing rules.
+	 * @param lines array of strings with lines of code, line to be adjusted is `this.row`
+	 * @param macros map from macro names to arrays of label nodes, this can be from a running accumulation
+	*/
+	AdjustLine(lines: string[], macros: Set<string> | Map<string,LabelNode[]>) : string
 	{
 		// Doing this with regex only - have to be careful
 		const programLine = lines[this.row];

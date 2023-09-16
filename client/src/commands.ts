@@ -68,6 +68,42 @@ export class FormattingTool
 	}
 }
 
+export class MasterSelect
+{
+	contextIndicator: vscode.StatusBarItem;
+	constructor(ind: vscode.StatusBarItem) {
+		this.contextIndicator = ind;
+	}
+	async selectMaster()
+	{
+		let verified = lxbase.verify_document();
+		if (!verified)
+			return;
+		const save_uri = verified.doc.uri;
+		const master_list = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
+			{
+				command: 'merlin6502.getMasterList',
+				arguments: [verified.doc.uri.toString()]
+			});
+		if (!master_list)
+			return;
+		const sel = await vscode.window.showQuickPick(master_list);
+		if (!sel)
+			return;
+		verified = lxbase.verify_document();
+		if (!verified)
+			return;
+		if (verified.doc.uri != save_uri)
+			return;
+		await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
+			{
+				command: 'merlin6502.selectMaster',
+				arguments: [sel]
+			});
+		this.contextIndicator.text = path.basename(sel,".S");
+	}
+}
+
 export class DisassemblyTool
 {
 	async getAddressInput(name: string,min:number,max:number,suggestion:number) : Promise<number | undefined>

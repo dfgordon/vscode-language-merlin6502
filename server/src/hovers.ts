@@ -5,6 +5,7 @@ import { AddressHovers } from './hoversAddresses';
 import { OpcodeHovers, PseudoOpcodeHovers } from './hoversStatements';
 import * as lxbase from './langExtBase';
 import * as labels from './labels';
+import { relativeToWorkspace } from './workspace';
 import { merlin6502Settings } from './settings';
 
 function MarkdownString(s: string): vsserv.MarkupContent
@@ -12,7 +13,7 @@ function MarkdownString(s: string): vsserv.MarkupContent
 	return { kind: 'markdown', value: s };
 }
 
-export class TSHoverProvider extends lxbase.LangExtBase
+export class HoverProvider extends lxbase.LangExtBase
 {
 	labelSentry: labels.LabelSentry;
 	labelSet: labels.LabelSet | undefined;
@@ -24,9 +25,9 @@ export class TSHoverProvider extends lxbase.LangExtBase
 	range = vsserv.Range.create(0,0,0,0);
 	currDoc: vsserv.TextDocumentItem | null = null;
 	lines: string[] = [];
-	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings, sentry: labels.LabelSentry)
+	constructor(TSInitResult : [Parser,Parser.Language], logger: lxbase.Logger, settings: merlin6502Settings, sentry: labels.LabelSentry)
 	{
-		super(TSInitResult,settings);
+		super(TSInitResult,logger,settings);
 		this.labelSentry = sentry;
 	}
 
@@ -171,7 +172,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 						}
 						else
 						{
-							str += '\n\nof ' + lxbase.relativeToWorkspace(this.labelSentry.workspaceFolders,node.doc.uri);
+							str += '\n\nof ' + relativeToWorkspace(this.labelSentry.context.folders,node.doc.uri);
 							str += '\n```\n' + node.doc.text.split(/\r?\n/)[row] + '\n```';
 							this.hover.push(MarkdownString(str));
 							this.append_doc_str(node.doc, node.rng);
@@ -196,7 +197,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 				} else if (inner == 'global_label') {
 					this.hover.push(MarkdownString('global defined right here'));
 					// const next = curs.currentNode().nextNamedSibling;
-					const entries = this.labelSentry.entries.get(curs.nodeText);
+					const entries = this.labelSentry.context.entries.get(curs.nodeText);
 					if (!entries)
 						return lxbase.WalkerOptions.exit;
 					// if (next && next.type == 'psop_ent')
@@ -209,7 +210,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 									'\n```\n' + node.doc.text.split(/\r?\n/)[row] + '\n```'));
 							else
 								this.hover.push(MarkdownString('entry found in file\n\n' +
-									lxbase.relativeToWorkspace(this.labelSentry.workspaceFolders, node.doc.uri) +
+									relativeToWorkspace(this.labelSentry.context.folders, node.doc.uri) +
 									'\n\non line ' + (row + 1) +
 									'\n```\n' + node.doc.text.split(/\r?\n/)[row] + '\n```'));
 						}
@@ -230,7 +231,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 			return undefined;
 		this.lines = document.getText().split(/\r?\n/);
 		this.labelSet = test; 
-		this.currDoc = this.labelSentry.currMain;
+		this.currDoc = vsserv.TextDocumentItem.create(document.uri,'merlin6502',document.version,document.getText());
 		if (!this.currDoc)
 			return undefined;
 		this.hover = new Array<vsserv.MarkupContent>();
@@ -239,7 +240,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 		for (this.row=0;this.row<this.lines.length;this.row++)
 		{
 			const tree = this.parse(this.AdjustLine(this.lines,this.labelSet.macros),"\n");
-			this.walk(tree,this.get_hover.bind(this));
+			this.walk(tree,this.get_hover.bind(this),undefined);
 			if (this.hover.length > 0) {
 				const content: string[] = [];
 				this.hover.forEach(h => {

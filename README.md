@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest update*: disassembler accepts wider inputs, dependency updates, CI runs on 3 platforms 
+*latest update*: better handling of PUT and USE files, NIB and 2MG support (requires a2kit v2.2.0 or later)
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
@@ -66,6 +66,8 @@ The extension will fully analyze `PUT` and `USE` includes, assuming it can find 
 * The ProDOS path and the VS Code project path do not need to match in any way
 * If more than one file match is found, the extension will flag it as an error
 * The file extension should *not* be included in the pseudo-op argument
+
+When editing an include, the master file that defines the context is shown in the lower toolbar.  Clicking on the indicator allows the user to select a different context if applicable, i.e., if the include appears in more than one file.
 
 ## Processor target and the XC pseudo-operation
 

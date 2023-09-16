@@ -86,9 +86,9 @@ export class FormattingTool extends lxbase.LangExtBase
 		'accum': '',
 		's': ''
 	});
-	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings, sentry: labels.LabelSentry)
+	constructor(TSInitResult : [Parser,Parser.Language], logger: lxbase.Logger, settings: merlin6502Settings, sentry: labels.LabelSentry)
 	{
-		super(TSInitResult,settings);
+		super(TSInitResult,logger,settings);
 		this.labelSentry = sentry;
 		this.set_widths();
 	}
@@ -124,7 +124,7 @@ export class FormattingTool extends lxbase.LangExtBase
 		{
 			this.formattedLine = this.AdjustLine(lines,macros);
 			const tree = this.parse(this.formattedLine,"\n");
-			this.walk(tree,this.format_node.bind(this));
+			this.walk(tree,this.format_node.bind(this),undefined);
 			this.formattedCode += this.formattedLine.
 				replace(RegExp('^'+this.callToken),'').
 				replace(/\s+/g,' ').
@@ -144,7 +144,7 @@ export class FormattingTool extends lxbase.LangExtBase
 			{
 				this.formattedLine = this.AdjustLine(lines,macros);
 				const tree = this.parse(this.formattedLine,"\n");
-				this.walk(tree,this.format_node.bind(this));
+				this.walk(tree,this.format_node.bind(this),undefined);
 				this.formattedLine = this.formattedLine.replace(RegExp('^' + this.callToken), '').replace(/\s+/g, ' ');
 				this.formattedLine = formatTokens(this.formattedLine, ' ', this.widths);
 				this.formattedLine = this.formattedLine.trimEnd().replace(RegExp(this.persistentSpace,'g'),' ');
@@ -184,7 +184,7 @@ export class FormattingTool extends lxbase.LangExtBase
 		this.row = position.line;
 		this.formattedLine = this.AdjustLine(lines, macros);
 		const tree = this.parse(this.formattedLine, "\n");
-		this.walk(tree, this.format_node.bind(this));
+		this.walk(tree, this.format_node.bind(this),undefined);
 		// Now that persistent spaces are in place we can safely use regex
 		if (ch==' ')
 		{
@@ -211,9 +211,9 @@ export class Tokenizer extends lxbase.LangExtBase
 	tokenizedProgram = new Array<number>();
 	columns = 0;
 	widths = [9, 6, 11];
-	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings, sentry: labels.LabelSentry)
+	constructor(TSInitResult : [Parser,Parser.Language], logger: lxbase.Logger, settings: merlin6502Settings, sentry: labels.LabelSentry)
 	{
-		super(TSInitResult,settings);
+		super(TSInitResult,logger,settings);
 		this.labelSentry = sentry;
 		this.set_widths();
 	}
@@ -285,7 +285,7 @@ export class Tokenizer extends lxbase.LangExtBase
 		this.columns = 1;
 		this.tokenizedLine = new Array<number>();
 		const tree = this.parse(this.line, '\n');
-		this.walk(tree, this.visit.bind(this));
+		this.walk(tree, this.visit.bind(this),undefined);
 		if (this.tokenizeLine.length > 126)
 			this.tokenizedLine = undefined;
 		if (this.tokenizedLine == undefined)
@@ -348,9 +348,9 @@ export class DisassemblyTool extends lxbase.LangExtBase
 {
 	widths = [9, 6, 11];
 	disassemblyMap : Map<number,OpData>;
-	constructor(TSInitResult : [Parser,Parser.Language], settings: merlin6502Settings)
+	constructor(TSInitResult : [Parser,Parser.Language], logger: lxbase.Logger, settings: merlin6502Settings)
 	{
-		super(TSInitResult,settings);
+		super(TSInitResult,logger,settings);
 		// This map creates a string where we can simply search for a number,
 		// and the number is the length of the binary data.  Furthermore,
 		// the value of the data replaces the number.

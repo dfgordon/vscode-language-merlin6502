@@ -405,7 +405,7 @@ export class A2KitTool
 		const uri = await vscode.window.showOpenDialog({
 			"canSelectMany": false,
 			"canSelectFiles": true,
-			"filters": { "Disk image": ["dsk", "do", "d13", "po", "woz"] },
+			"filters": { "Disk image": ["2mg", "2img", "dsk", "do", "d13", "nib", "po", "woz"] },
 			"title": "Insert from Disk Image"
 		});
 		if (!uri) {
@@ -421,7 +421,7 @@ export class A2KitTool
 		const uri = await vscode.window.showOpenDialog({
 			"canSelectMany": false,
 			"canSelectFiles": true,
-			"filters": { "Disk image": ["dsk", "do", "d13", "po", "woz"] },
+			"filters": { "Disk image": ["2mg", "2img", "dsk", "do", "d13", "nib", "po", "woz"] },
 			"title": "Save to Disk Image"
 		});
 		if (!uri) {

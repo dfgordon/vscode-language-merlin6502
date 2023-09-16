@@ -29,21 +29,28 @@ export function activate(context: vscode.ExtensionContext)
 
 	client = new vsclnt.LanguageClient('merlin6502', 'Merlin 6502', serverOptions, clientOptions);
 	client.start();
-	const disassembler = new com.DisassemblyTool();
-	const formatter = new com.FormattingTool();
-	const a2kit = new dimg.A2KitTool();
 
 	const versionIndicator = vscode.window.createStatusBarItem();
 	const typeIndicator = vscode.window.createStatusBarItem();
+	const contextIndicator = vscode.window.createStatusBarItem();
 	versionIndicator.text = vscode.workspace.getConfiguration('merlin6502').get('version') as string;
 	versionIndicator.tooltip = 'Merlin version being targeted (see settings)';
-	typeIndicator.text = 'source';
-	typeIndicator.tooltip = 'How the file is interpreted, as source or linker commands'
+	typeIndicator.text = 'pending';
+	typeIndicator.tooltip = 'How the file is interpreted, as source or linker commands';
+	contextIndicator.text = 'pending';
+	contextIndicator.tooltip = 'Master file determining the context of an include';
+	contextIndicator.command = "merlin6502.selectMaster";
+
+	const disassembler = new com.DisassemblyTool();
+	const formatter = new com.FormattingTool();
+	const a2kit = new dimg.A2KitTool();
+	const masterSelect = new com.MasterSelect(contextIndicator);
 
 	const startEditor = vscode.window.activeTextEditor;
 	if (startEditor?.document.languageId=='merlin6502') {
 		versionIndicator.show();
 		typeIndicator.show();
+		contextIndicator.show();
 	}
 
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",disassembler.getFrontVirtualII,disassembler));
@@ -52,15 +59,24 @@ export function activate(context: vscode.ExtensionContext)
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.columns", formatter.resizeColumns, formatter));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFromDiskImage", a2kit.getFromImage, a2kit));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.saveToDiskImage", a2kit.putToImage, a2kit));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.selectMaster", masterSelect.selectMaster, masterSelect));
 
 	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
 		if (editor?.document.languageId == 'merlin6502') {
-			//client.sendRequest('merlin6502.didChangeActiveEditor',editor.document.uri.toString());
-			versionIndicator.show();
-			typeIndicator.show();
+			client.sendRequest(vsclnt.ExecuteCommandRequest.type, {
+				command: 'merlin6502.getIndicators',
+				arguments: [editor.document.uri.toString()]
+			}).then(x => {
+				typeIndicator.text = x[0];
+				contextIndicator.text = x[1];
+				versionIndicator.show();
+				typeIndicator.show();
+				contextIndicator.show();
+			});
 		} else {
 			versionIndicator.hide();
 			typeIndicator.hide();
+			contextIndicator.hide();
 		}
 	}));
 
@@ -72,6 +88,9 @@ export function activate(context: vscode.ExtensionContext)
 
 	client.onNotification<string>(new vsclnt.NotificationType<string>('merlin6502.interpretation'), params => {
 		typeIndicator.text = params;
+	});
+	client.onNotification<string>(new vsclnt.NotificationType<string>('merlin6502.context'), params => {
+		contextIndicator.text = params;
 	});
 }
 
