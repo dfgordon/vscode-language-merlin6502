@@ -3,7 +3,6 @@ import Parser from 'web-tree-sitter';
 import * as lxbase from './langExtBase';
 import { DiagnosticSet } from './diagnostics';
 import { MerlinContext } from './workspace';
-import { merlin6502Settings } from './settings';
 
 function Defined(name: string, map: Map<string, LabelNode[]>): boolean
 {

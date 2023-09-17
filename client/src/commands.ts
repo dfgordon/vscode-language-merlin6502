@@ -104,6 +104,25 @@ export class MasterSelect
 	}
 }
 
+export class RescanTool
+{
+	rescanButton: vscode.StatusBarItem;
+	constructor(ind: vscode.StatusBarItem) {
+		this.rescanButton = ind;
+	}
+	rescan()
+	{
+		let verified = lxbase.verify_document();
+		if (!verified)
+			return;
+		client.sendRequest(vsclnt.ExecuteCommandRequest.type,
+			{
+				command: 'merlin6502.rescan',
+				arguments: [verified.doc.uri.toString()]
+			});
+	}
+}
+
 export class DisassemblyTool
 {
 	async getAddressInput(name: string,min:number,max:number,suggestion:number) : Promise<number | undefined>

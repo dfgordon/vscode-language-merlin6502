@@ -5,7 +5,7 @@ import * as comm from './commands';
 import * as hov from './hovers';
 import * as compl from './completions';
 import * as tok from './semanticTokens';
-import { MerlinContext } from './workspace';
+import { AnalysisStack, MerlinContext } from './workspace';
 import {LabelSentry, LabelNode, LabelSet} from './labels';
 import * as lxbase from './langExtBase';
 import * as Parser from 'web-tree-sitter';
@@ -119,6 +119,7 @@ connection.onInitialized(() => {
 connection.onDidChangeConfiguration(() => {
 	connection.workspace.getConfiguration('merlin6502').then(settings => {
 		globalSettings = settings;
+		context.configure(globalSettings);
 		hoverTool.configure(globalSettings);
 		codeTool.configure(globalSettings);
 		addressTool.configure(globalSettings);
@@ -127,9 +128,11 @@ connection.onDidChangeConfiguration(() => {
 		tokenizer.configure(globalSettings);
 		tokens.configure(globalSettings);
 	}).then(() => {
-		windowDocs.all().forEach(doc => {
-			validateTextDocument(vsserv.TextDocumentItem.create(doc.uri,'merlin6502',doc.version,doc.getText()));
-		});
+		// emptying the stack will cause an update, because:
+		// 1. client notifies server when active editor changes
+		// 2. server checks to see if there is a re-usable context
+		// 3. if no re-usable context (empty stack) force an update
+		context.stack = new AnalysisStack;
 	});
 });
 
@@ -374,32 +377,40 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 		if (params.arguments)
 			return tokenizer.detokenize(params.arguments);
 	}
-	else if (params.command == 'merlin6502.getIndicators') {
-		// TODO: get interpretation from something mapped by document
+	else if (params.command == 'merlin6502.activeEditorChanged') {
 		if (params.arguments) {
 			//logger.log("looping to find " + params.arguments[0]);
 			for (const doc of context.docs) {
 				if (doc.uri == params.arguments[0]) {
-					const docItem = vsserv.TextDocumentItem.create(doc.uri, 'merlin6502', doc.version, doc.text);
-					let master = context.get_master(docItem);
-					let needs_analysis = false;
-					if (context.stack.doc.length == 0) {
-						needs_analysis = true;
-					} else {
-						needs_analysis = master.uri != context.stack.doc[0].uri;
+					let master = context.get_master(doc);
+					if (context.stack.doc.length == 0 || master.uri != context.stack.doc[0].uri) {
+						logger.log("rescan and analyze " + doc.uri);
+						context.rescan_entries = true;
+						validateTextDocument(doc);
 					}
-					if (!needs_analysis) {
+					else {
 						logger.log("reusing context " + master.uri);
-						return [context.interpretation, path.basename(master.uri, ".S")]
+						connection.sendNotification(new vsserv.NotificationType<string>('merlin6502.interpretation'), context.interpretation);
+						const currMaster = path.basename(master.uri, ".S");
+						connection.sendNotification(new vsserv.NotificationType<string>('merlin6502.context'), currMaster);
 					}
-					logger.log("analyzing " + doc.uri);
-					validateTextDocument(doc);
-					return [context.interpretation, path.basename(master.uri, ".S")]
 				}
 			}
-			return [context.interpretation, "master"];
 		}
-		return ["err", "err"];
+	}
+	else if (params.command == 'merlin6502.rescan') {
+		// unconditionally scan workspace
+		logger.log("starting forced workspace scan");
+		await getAllWorkspaceDocs();
+		if (params.arguments) {
+			//logger.log("looping to find " + params.arguments[0]);
+			for (const doc of context.docs) {
+				if (doc.uri == params.arguments[0]) {
+					logger.log("analyzing " + doc.uri);
+					validateTextDocument(doc);
+				}
+			}
+		}
 	}
 	else if (params.command == 'merlin6502.getMasterList') {
 		if (params.arguments) {
@@ -424,7 +435,7 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 			context.preferred_master = params.arguments[0];
 			for (const doc of context.docs) {
 				if (doc.uri == context.preferred_master) {
-					('rescanning after master selection');
+					logger.log('rescanning after master selection');
 					await getAllWorkspaceDocs();
 					validateTextDocument(doc);
 				}

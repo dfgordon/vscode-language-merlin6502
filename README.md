@@ -124,7 +124,7 @@ This capability only applies to MacOS. Note that [Virtual \]\[](https://virtuali
 
 ## Using with Disk Images
 
-You can access files on a disk image.  In order to do this you must install `a2kit`.  If you have `cargo`, use the terminal to run `cargo install a2kit`, otherwise see the [github page](https://github.com/dfgordon/a2kit).  The extension will work with whatever image types `a2kit` supports.  As of this writing, the supported types are `woz`, `dsk`, `do`, `po`, `d13`.
+You can access files on a disk image.  In order to do this you must install `a2kit`.  If you have `cargo`, use the terminal to run `cargo install a2kit`, otherwise you can [download an executable](https://github.com/dfgordon/a2kit/releases), taking care to put it in your terminal's path.  As of this writing, the supported image types are `woz`, `dsk`, `do`, `po`, `d13`, `nib`, and `2mg`, assuming the latest `a2kit` is installed.
 
 * `merlin6502: Insert from disk image`: brings up a file selector allowing you to choose an image file.  Once done, use the mini-menu to traverse the image's directory tree (if applicable) and select either a `TXT` or `BIN` file.  If a `TXT` file is selected it will be decoded as Merlin source and inserted. If a `BIN` file is selected, respond to the disassembly prompts, after which the disassembly is inserted.
 

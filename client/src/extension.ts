@@ -33,24 +33,30 @@ export function activate(context: vscode.ExtensionContext)
 	const versionIndicator = vscode.window.createStatusBarItem();
 	const typeIndicator = vscode.window.createStatusBarItem();
 	const contextIndicator = vscode.window.createStatusBarItem();
+	const rescanButton = vscode.window.createStatusBarItem();
 	versionIndicator.text = vscode.workspace.getConfiguration('merlin6502').get('version') as string;
-	versionIndicator.tooltip = 'Merlin version being targeted (see settings)';
-	typeIndicator.text = 'pending';
-	typeIndicator.tooltip = 'How the file is interpreted, as source or linker commands';
-	contextIndicator.text = 'pending';
-	contextIndicator.tooltip = 'Master file determining the context of an include';
+	versionIndicator.tooltip = "Merlin version being targeted (see settings)";
+	typeIndicator.text = "pending";
+	typeIndicator.tooltip = "How the file is interpreted, as source or linker commands";
+	contextIndicator.text = "pending";
+	contextIndicator.tooltip = "File defining context of analysis";
 	contextIndicator.command = "merlin6502.selectMaster";
+	rescanButton.text = "rescan";
+	rescanButton.tooltip = "rescan modules and includes";
+	rescanButton.command = "merlin6502.rescan";
 
 	const disassembler = new com.DisassemblyTool();
 	const formatter = new com.FormattingTool();
 	const a2kit = new dimg.A2KitTool();
 	const masterSelect = new com.MasterSelect(contextIndicator);
+	const rescanner = new com.RescanTool(rescanButton);
 
 	const startEditor = vscode.window.activeTextEditor;
 	if (startEditor?.document.languageId=='merlin6502') {
 		versionIndicator.show();
 		typeIndicator.show();
 		contextIndicator.show();
+		rescanButton.show();
 	}
 
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",disassembler.getFrontVirtualII,disassembler));
@@ -60,23 +66,25 @@ export function activate(context: vscode.ExtensionContext)
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFromDiskImage", a2kit.getFromImage, a2kit));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.saveToDiskImage", a2kit.putToImage, a2kit));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.selectMaster", masterSelect.selectMaster, masterSelect));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.rescan", rescanner.rescan, rescanner));
 
 	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
 		if (editor?.document.languageId == 'merlin6502') {
+			typeIndicator.text = "pending";
+			contextIndicator.text = "pending";
+			versionIndicator.show();
+			typeIndicator.show();
+			contextIndicator.show();
+			rescanButton.show();
 			client.sendRequest(vsclnt.ExecuteCommandRequest.type, {
-				command: 'merlin6502.getIndicators',
+				command: 'merlin6502.activeEditorChanged',
 				arguments: [editor.document.uri.toString()]
-			}).then(x => {
-				typeIndicator.text = x[0];
-				contextIndicator.text = x[1];
-				versionIndicator.show();
-				typeIndicator.show();
-				contextIndicator.show();
 			});
 		} else {
 			versionIndicator.hide();
 			typeIndicator.hide();
 			contextIndicator.hide();
+			rescanButton.hide();
 		}
 	}));
 

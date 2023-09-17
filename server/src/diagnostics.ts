@@ -6,7 +6,6 @@ import { MerlinContext } from './workspace';
 import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
 import * as labels from './labels';
-import { merlin6502Settings } from './settings';
 
 export class DiagnosticSet
 {
