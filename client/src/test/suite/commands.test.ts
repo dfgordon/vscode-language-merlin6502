@@ -25,7 +25,7 @@ describe('Commands: format', function() {
 		await testFormat('test-fmt-comments.S', expectedCode);
 	});
 	it('strings', async function() {
-        const expectedCode = ' LDA #$00\n ASC "spaces   spaces"\n';
+        const expectedCode = ' LDA #$00\n ASC "spaces   spaces"\nmymac MAC\n INX\n EOM\n mymac "hello world"\n';
 		await testFormat('test-fmt-strings.S', expectedCode);
 	});
 });

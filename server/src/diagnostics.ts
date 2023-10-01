@@ -1,5 +1,4 @@
 import * as vsserv from 'vscode-languageserver';
-import * as vsdoc from 'vscode-languageserver-textdocument';
 import Parser from 'web-tree-sitter';
 import * as lxbase from './langExtBase';
 import { MerlinContext } from './workspace';
@@ -295,7 +294,7 @@ class GeneralSyntaxSentry
 		// these may coincide with previous node types, so must be outside else if sequence
 		if (curs.nodeType.slice(0,4)=='arg_' && curs.nodeText.length > maxc3c4Len && merlinVersion!='v32')
 		{
-			diag.push(vsserv.Diagnostic.create(rng,'column 3 is too long (max = '+maxc3c4Len+')',vsserv.DiagnosticSeverity.Error))
+			diag.push(vsserv.Diagnostic.create(rng, 'column 3 is too long (max = ' + maxc3c4Len + ')', vsserv.DiagnosticSeverity.Error));
 		}
 		else if (dstring_psops.includes(curs.nodeType) && (merlinVersion=='v8' || merlinVersion=='v16'))
 		{
@@ -316,6 +315,9 @@ class GeneralSyntaxSentry
 			}
 			if (count>2 && newRng)
 				diag.push(vsserv.Diagnostic.create(newRng,'extended string operand requires Merlin 16+/32',vsserv.DiagnosticSeverity.Error));
+		}
+		else if (curs.nodeType == 'arg_literal' || curs.nodeType == 'literal') {
+			diag.push(vsserv.Diagnostic.create(rng, 'uninterpreted literal', vsserv.DiagnosticSeverity.Information));
 		}
 	}
 }
@@ -353,6 +355,13 @@ export class DiagnosticProvider
 			this.procSentry.visit(this.diag.curr, curs, rng);
 			this.psopSentry.visit(this.diag.curr, curs, rng);
 			this.generalSentry.visit(this.diag.curr, curs, rng);
+			if (curs.nodeType == "psop_use" || curs.nodeType == "psop_put")
+			{
+				const currCtx = this.context.stack.ctx[this.context.stack.ctx.length - 1];
+				const psop = curs.nodeType.substring(5, 8).toUpperCase();
+				if (currCtx == lxbase.SourceOptions.master)
+					return lxbase.WalkerOptions.gotoInclude;
+			}
 		}
 		return lxbase.WalkerOptions.gotoChild;
 	}
@@ -369,7 +378,7 @@ export class DiagnosticProvider
 			this.psopSentry = new PseudoOpSentry(this.context);
 			this.procSentry = new ProcessorModeSentry(this.context);
 			this.generalSentry = new GeneralSyntaxSentry(this.context);
-			const macros = this.labelSentry.running;
+			const macros = this.labelSentry.runningMacros;
 			this.context.analyze(displayDoc, macros, this.visit_verify.bind(this));
 		}
 		return this.diag;

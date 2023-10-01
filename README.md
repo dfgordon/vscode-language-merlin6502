@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest update*: better handling of PUT and USE files, NIB and 2MG support (requires a2kit v2.2.0 or later)
+*latest update*: more accurate handling of macro arguments
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace

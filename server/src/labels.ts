@@ -113,7 +113,8 @@ export class LabelSentry
 	private labels = new LabelSet();
 	/** label sets for all master documents, mapped by uri */
 	shared = new Map<string,LabelSet>();
-	running = new Set<string>();
+	runningMacros = new Set<string>();
+	runningVars = new Set<string>();
 	inMacro = false;
 	currScopeName = '';
 	currScopeNode: LabelNode | undefined;
@@ -150,46 +151,52 @@ export class LabelSentry
 				if (Defined(child.text,this.labels.globals))
 					this.diag.add(vsserv.Diagnostic.create(rng,'macro name is used previously as a label',vsserv.DiagnosticSeverity.Error));
 				AddLabel(child.text, lnode, this.labels.macros);
+				this.runningMacros.add(curr.text); // needed to capture macro_ref nodes that collide, like `inc16`
 			}			
 			else
 			{
 				this.diag.add(vsserv.Diagnostic.create(rng,'macro label needs to be global',vsserv.DiagnosticSeverity.Error));
 			}
+			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (child && curr.type=='label_def')
+		else if (child && curr.type=='label_def')
 		{
 			const lnode = new LabelNode(currDoc, curr, rng);
-			if (child.type=='global_label')
-			{
-				if (Defined(child.text,this.labels.globals))
-					this.diag.add(vsserv.Diagnostic.create(rng,'redefinition of a global label',vsserv.DiagnosticSeverity.Error));
-				if (Defined(child.text,this.labels.macros))
-					this.diag.add(vsserv.Diagnostic.create(rng,'label name is used previously as a macro'))
+			if (child.type == 'global_label') {
+				if (Defined(child.text, this.labels.globals))
+					this.diag.add(vsserv.Diagnostic.create(rng, 'redefinition of a global label', vsserv.DiagnosticSeverity.Error));
+				if (Defined(child.text, this.labels.macros))
+					this.diag.add(vsserv.Diagnostic.create(rng, 'label name is used previously as a macro'))
 				AddLabel(child.text, lnode, this.labels.globals);
 				this.currScopeName = child.text;
 				this.currScopeNode = lnode;
 			}
-			else if (child.type=='local_label')
-			{
+			else if (child.type == 'local_label') {
 				const xName = this.currScopeName + '\u0100' + child.text;
-				if (Defined(xName,this.labels.locals))
-					this.diag.add(vsserv.Diagnostic.create(rng,'redefinition of a local label',vsserv.DiagnosticSeverity.Error));
+				if (Defined(xName, this.labels.locals))
+					this.diag.add(vsserv.Diagnostic.create(rng, 'redefinition of a local label', vsserv.DiagnosticSeverity.Error));
 				AddLabel(xName, lnode, this.labels.locals);
-				if (this.currScopeNode && this.currScopeNode.doc.uri==currDoc.uri)
-					this.currScopeNode.children.push(new ChildLabel(currDoc.uri,lnode.rng,child.text));
+				if (this.currScopeNode && this.currScopeNode.doc.uri == currDoc.uri)
+					this.currScopeNode.children.push(new ChildLabel(currDoc.uri, lnode.rng, child.text));
 			}
-			else if (child.type=='var_label')
-			{
-				AddLabel(child.text,lnode,this.labels.vars);
+			else if (child.type == 'var_label') {
+				if (child.firstNamedChild?.type=='var_mac')
+					this.diag.add(vsserv.Diagnostic.create(rng, 'macro substitution variable cannot label a line', vsserv.DiagnosticSeverity.Error));
+				else if (child.firstNamedChild?.type=='var_cnt' && this.context.merlinVersion!='v8')
+					this.diag.add(vsserv.Diagnostic.create(rng, 'argument count cannot label a line', vsserv.DiagnosticSeverity.Error));
+				else
+					AddLabel(child.text, lnode, this.labels.vars);
 			}
+			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (child && curr.type == 'macro_ref')
+		else if (child && curr.type == 'macro_ref')
 		{
             const lnode = new LabelNode(currDoc,curr,rng);
 			if (child.type=='global_label')
 				AddLabel(child.text,lnode,this.labels.macros);
+			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (child && curr.type == 'label_ref')
+		else if (child && curr.type == 'label_ref')
 		{
             const lnode = new LabelNode(currDoc,curr,rng);
 			if (child.type=='global_label')
@@ -200,6 +207,7 @@ export class LabelSentry
 			}
 			else if (child.type=='var_label')
 				AddLabel(child.text,lnode,this.labels.vars);
+			return lxbase.WalkerOptions.gotoSibling;
 		}
 		if ((curr.type == 'psop_put' || curr.type == 'psop_use') && currCtx==lxbase.SourceOptions.master)
 			return lxbase.WalkerOptions.gotoInclude;
@@ -234,7 +242,6 @@ export class LabelSentry
 		const macroAverse = ['psop_ent','psop_ext','psop_exd','psop_put','psop_use','psop_sav'];
 		const curr = curs.currentNode();
 		const child = curr.firstChild;
-		const is_var = (child && child.type=='var_label') && (![...'123456789'].includes(curr.text[1]) || curr.text.length>2);
 		const localLabelExt = this.currScopeName + '\u0100' + curr.text;
 		this.diag.set_doc(currDoc);
 		if (child && curr.type=='label_ref')
@@ -246,11 +253,27 @@ export class LabelSentry
 			else if (child.type=='local_label' && !Defined(localLabelExt,this.labels.locals))
 				this.diag.add(vsserv.Diagnostic.create(rng,'local label is not defined in this scope',vsserv.DiagnosticSeverity.Error));
 			else if (child.type=='local_label' && this.inMacro)
-				this.diag.add(vsserv.Diagnostic.create(rng,'cannot use local labels in a macro',vsserv.DiagnosticSeverity.Error));
-			else if (is_var && !Defined(curr.text,this.labels.vars))
-				this.diag.add(vsserv.Diagnostic.create(rng,'variable is undefined',vsserv.DiagnosticSeverity.Error));
-			else if (is_var && !this.running.has(curr.text))
-				this.diag.add(vsserv.Diagnostic.create(rng,'variable is forward referenced',vsserv.DiagnosticSeverity.Warning));
+				this.diag.add(vsserv.Diagnostic.create(rng, 'cannot use local labels in a macro', vsserv.DiagnosticSeverity.Error));
+			else if (child.type == 'var_label') {
+				if (child.firstNamedChild?.type == 'var_mac' && this.inMacro)
+					return lxbase.WalkerOptions.gotoSibling;
+				else if (child.firstNamedChild?.type == 'var_cnt' && this.context.merlinVersion!='v8' && this.inMacro)
+					return lxbase.WalkerOptions.gotoSibling;
+				else if (child.firstNamedChild?.type=='var_mac' && !this.inMacro)
+					this.diag.add(vsserv.Diagnostic.create(rng, 'macro substitution variable referenced outside macro', vsserv.DiagnosticSeverity.Error));
+				else if (child.firstNamedChild?.type=='var_cnt' && this.context.merlinVersion!='v8' && !this.inMacro)
+					this.diag.add(vsserv.Diagnostic.create(rng, 'argument count referenced outside macro', vsserv.DiagnosticSeverity.Error));
+				else if (child.type == 'var_label' && !Defined(curr.text,this.labels.vars))
+					this.diag.add(vsserv.Diagnostic.create(rng,'variable is undefined',vsserv.DiagnosticSeverity.Error));
+				else if (child.type == 'var_label' && !this.runningVars.has(curr.text))
+					this.diag.add(vsserv.Diagnostic.create(rng,'variable is forward referenced',vsserv.DiagnosticSeverity.Warning));
+			}
+			return lxbase.WalkerOptions.gotoSibling
+		}
+		// handle `var_mac` occurrences that have no `var_label` parent
+		else if (curr.type == 'var_mac' && !this.inMacro)
+		{
+			this.diag.add(vsserv.Diagnostic.create(rng, 'macro substitution variable referenced outside macro', vsserv.DiagnosticSeverity.Error));
 		}
 		else if (child && curr.type=='label_def')
 		{
@@ -266,8 +289,14 @@ export class LabelSentry
 				if (this.inMacro)
 					this.diag.add(vsserv.Diagnostic.create(rng,'cannot use local labels in a macro',vsserv.DiagnosticSeverity.Error));
 			}
-			else if (child.type=='var_label')
-				this.running.add(curr.text);
+			else if (child.type=='var_label') // no harm in adding mac args too
+				this.runningVars.add(curr.text);
+			return lxbase.WalkerOptions.gotoSibling
+		}
+		else if (curr.type=='macro_def')
+		{
+			this.runningMacros.add(curr.text);
+			this.inMacro = true;
 		}
 		else if (curr.type=='macro_ref')
 		{
@@ -275,7 +304,7 @@ export class LabelSentry
 				this.diag.add(vsserv.Diagnostic.create(rng,'expected macro, this is a label',vsserv.DiagnosticSeverity.Error));
 			else if (!Defined(curr.text,this.labels.macros))
 				this.diag.add(vsserv.Diagnostic.create(rng,'macro is undefined',vsserv.DiagnosticSeverity.Error));
-			else if (!this.running.has(curr.text))
+			else if (!this.runningMacros.has(curr.text))
 				this.diag.add(vsserv.Diagnostic.create(rng,'macro is forward referenced',vsserv.DiagnosticSeverity.Error));
 		}
 		else if (curr.type == "psop_use" || curr.type == "psop_put")
@@ -295,11 +324,6 @@ export class LabelSentry
 				this.diag.add(vsserv.Diagnostic.create(rng,'unmatched end of macro (EOM terminates all preceding MAC pseudo-ops)',vsserv.DiagnosticSeverity.Error));
 			this.inMacro = false;
 		}
-		else if (curr.type=='macro_def')
-		{
-			this.running.add(curr.text);
-			this.inMacro = true;
-		}
 		return lxbase.WalkerOptions.gotoChild;
 	}
 	/**
@@ -310,12 +334,13 @@ export class LabelSentry
 	{
 		this.context = ctx;
 		this.labels = new LabelSet();
-		this.running = new Set<string>();
+		this.runningMacros = new Set<string>();
+		this.runningVars = new Set<string>();
 		this.currScopeName = '';
 		this.currScopeNode = undefined;
 		this.inMacro = false;
 		this.diag = new DiagnosticSet;
-		this.context.analyze(document, this.running, this.visit_gather.bind(this));
+		this.context.analyze(document, this.runningMacros, this.visit_gather.bind(this));
 	}
 	/**
 	 * verify the label set associated with a document, assumes label set has been built
@@ -324,11 +349,12 @@ export class LabelSentry
 	verify_main(document: vsserv.TextDocumentItem,ctx: MerlinContext)
 	{
 		this.context = ctx;
-		this.running = new Set<string>();
+		this.runningMacros = new Set<string>();
+		this.runningVars = new Set<string>();
 		this.currScopeName = '';
 		this.currScopeNode = undefined;
 		this.inMacro = false;
-		this.context.analyze(document, this.running, this.visit_verify.bind(this));
+		this.context.analyze(document, this.runningMacros, this.visit_verify.bind(this));
 		// correlate EXT and ENT
 		for (const [lbl, lst] of this.labels.globals)
 			for (const lnode of lst)

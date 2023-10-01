@@ -100,6 +100,20 @@ describe('Diagnostics: Macros', function () {
 			/no corresponding entry/
 		]);
 	});
+	it('macro variables', async function () {
+		await diagnosticTester('test-mac-vars.S', [
+			/macro substitution variable cannot label a line/,
+			/macro substitution variable cannot label a line/,
+			/macro substitution variable referenced outside macro/,
+			/macro substitution variable referenced outside macro/,
+			/macro substitution variable referenced outside macro/
+		]);
+	});
+	it('macro args', async function () {
+		await diagnosticTester('test-mac-args.S', [
+			/uninterpreted literal/
+		]);
+	});
 });
 
 describe('Diagnostics: declarations', function () {

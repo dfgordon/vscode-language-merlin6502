@@ -169,10 +169,11 @@ function declarationsFromMap(map: Map<string,LabelNode[]>, params: vsserv.Defini
 }
 
 function definitionsFromMap(map: Map<string,LabelNode[]>, params: vsserv.DefinitionParams): Array<vsserv.Location> | undefined {
-	for (const vars of map.values()) {
+	for (const [key,vars] of map) {
 		const ans = new Array<vsserv.Location>();
 		let clicked = false;
 		for (const node of vars) {
+			//logger.log('checking ' + key + ',' + node.isDef + ',' + node.rng.start.line + ',' + node.doc.uri);
 			clicked = clicked || lxbase.rangeContainsPos(node.rng, params.position) && node.doc.uri == params.textDocument.uri;
 			if (node.isDef)
 				ans.push(vsserv.Location.create(node.doc.uri, node.rng));

@@ -51,7 +51,7 @@ export class TokenProvider extends lxbase.LangExtBase
 			this.tokensBuilder.push(...pos,...tokType('parameter'));
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (curs.nodeType=="var_label")
+		if (curs.nodeType=="var_label" || curs.nodeType=="var_mac")
 		{
 			this.tokensBuilder.push(...pos,...tokType('variable'));
 			return lxbase.WalkerOptions.gotoSibling;
@@ -86,7 +86,7 @@ export class TokenProvider extends lxbase.LangExtBase
 			this.tokensBuilder.push(...pos,...tokType('function'));
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (["dstring","pchar","nchar","literal_arg","literal","filename","trailing"].indexOf(curs.nodeType)>-1)
+		if (["dstring","pchar","nchar","filename","trailing"].indexOf(curs.nodeType)>-1)
 		{
 			this.tokensBuilder.push(...pos,...tokType('string'));
 			return lxbase.WalkerOptions.gotoSibling;
