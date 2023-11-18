@@ -1,12 +1,18 @@
 * test macro library
 COUT     =     $fded
 HOME     =     $fc58
+go       mac
+         INC   ]1
+         INY
+         eom
 message  mac
-         lda   #"M"
+         pmc   go,]2
+         ASC   ']2'
+         lda   #]1
          jsr   COUT
-         lda   #"e"
+         lda   #]2
          jsr   COUT
-         lda   #"r"
+         lda   #]3
          jsr   COUT
          lda   #"l"
          jsr   COUT
@@ -14,5 +20,6 @@ message  mac
          jsr   COUT
          lda   #"n"
          jsr   COUT
+         ASC   ']1'
          eom
 err      put   somefile

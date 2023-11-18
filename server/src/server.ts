@@ -256,6 +256,7 @@ connection.onDocumentSymbol(async params => {
 	ans = ans.concat(documentSymbolFromMap(labelSet.macros, vsserv.SymbolKind.Function, uri));
 	ans = ans.concat(documentSymbolFromMap(labelSet.vars, vsserv.SymbolKind.Variable, uri));
 	// local labels are put in as children of globals
+	// macro locals are put in as children of macros
 	return ans;
 });
 
@@ -263,7 +264,7 @@ connection.onDeclaration(params => {
 	const labelSet = labels.shared.get(params.textDocument.uri);
 	if (!labelSet)
 		return;
-	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars]) {
+	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars, labelSet.macro_locals]) {
 		const ans = declarationsFromMap(map, params);
 		if (ans)
 			return ans;
@@ -274,7 +275,7 @@ connection.onDefinition(params => {
 	const labelSet = labels.shared.get(params.textDocument.uri);
 	if (!labelSet)
 		return;
-	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars]) {
+	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars, labelSet.macro_locals]) {
 		const ans = definitionsFromMap(map, params);
 		if (ans)
 			return ans;
@@ -285,7 +286,7 @@ connection.onReferences(params => {
 	const labelSet = labels.shared.get(params.textDocument.uri);
 	if (!labelSet)
 		return;
-	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars]) {
+	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars, labelSet.macro_locals]) {
 		const ans = referencesFromMap(map, params);
 		if (ans)
 			return ans;
@@ -296,7 +297,7 @@ connection.onRenameRequest((params: vsserv.RenameParams): vsserv.WorkspaceEdit |
 	const labelSet = labels.shared.get(params.textDocument.uri);
 	if (!labelSet)
 		return;
-	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars]) {
+	for (const map of [labelSet.globals, labelSet.macros, labelSet.locals, labelSet.vars, labelSet.macro_locals]) {
 		const name = renamableFromMap(map, params);
 		if (name) {
 			const edits = new Array<vsserv.TextDocumentEdit>();

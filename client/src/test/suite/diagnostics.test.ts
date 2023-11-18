@@ -96,8 +96,7 @@ describe('Diagnostics: Macros', function () {
 		await diagnosticTester('test-mac-psops.S', [
 			/pseudo operation cannot be used/,
 			/pseudo operation cannot be used/,
-			/pseudo operation cannot be used/,
-			/no corresponding entry/
+			/pseudo operation cannot be used/
 		]);
 	});
 	it('macro variables', async function () {

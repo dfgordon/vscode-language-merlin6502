@@ -3,7 +3,7 @@ math     ext
          ext   ONE,TWO
          use   lib
          jsr   HOME
-         >>>   message
+         >>>   message,"M";"e";"r"
          jsr   math
          adc   #TWO
          rts

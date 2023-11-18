@@ -25,7 +25,8 @@ function tokType(typ: string) : [number,number] {
 export class TokenProvider extends lxbase.LangExtBase
 {
 	labelSentry: labels.LabelSentry;
-	tokensBuilder : vsserv.SemanticTokensBuilder = new vsserv.SemanticTokensBuilder();
+	tokensBuilder: vsserv.SemanticTokensBuilder = new vsserv.SemanticTokensBuilder();
+	macro_locals_pos = new Map<number,string>();
 
 	constructor(TSInitResult : [Parser,Parser.Language], logger: lxbase.Logger, settings: merlin6502Settings, sentry: labels.LabelSentry)
 	{
@@ -39,6 +40,11 @@ export class TokenProvider extends lxbase.LangExtBase
 		if (["macro_def","macro_ref"].includes(curs.nodeType))
 		{
 			this.tokensBuilder.push(...pos,...tokType('macro'));
+			return lxbase.WalkerOptions.gotoSibling;
+		}
+		if (curs.nodeType == "global_label" && this.macro_locals_pos.has(1000*pos[0] + pos[1]))
+		{
+			this.tokensBuilder.push(...pos, ...tokType('parameter'));
 			return lxbase.WalkerOptions.gotoSibling;
 		}
 		if (["global_label","current_addr"].includes(curs.nodeType))
@@ -101,9 +107,12 @@ export class TokenProvider extends lxbase.LangExtBase
 
 	provideDocumentRangeSemanticTokens(document:vsdoc.TextDocument,range: vsserv.Range): vsserv.SemanticTokens | null
 	{
-		let macros = this.labelSentry.shared.get(document.uri)?.macros;
-		if (!macros)
-			macros = new Map<string,labels.LabelNode[]>();
+		let labelSet = this.labelSentry.shared.get(document.uri);
+		let macros = new Map<string,labels.LabelNode[]>();
+		if (labelSet) {
+			macros = labelSet.macros;
+			this.macro_locals_pos = labelSet.macro_locals_pos;
+		}
 		const lines = document.getText().split(/\r?\n/);
 		this.tokensBuilder = new vsserv.SemanticTokensBuilder();
 		this.GetProperties(lines);
@@ -119,9 +128,12 @@ export class TokenProvider extends lxbase.LangExtBase
 
 	provideDocumentSemanticTokens(document:vsdoc.TextDocument): vsserv.SemanticTokens | null
 	{
-		let macros = this.labelSentry.shared.get(document.uri)?.macros;
-		if (!macros)
-			macros = new Map<string,labels.LabelNode[]>();
+		let labelSet = this.labelSentry.shared.get(document.uri);
+		let macros = new Map<string,labels.LabelNode[]>();
+		if (labelSet) {
+			macros = labelSet.macros;
+			this.macro_locals_pos = labelSet.macro_locals_pos;
+		}
 		const lines = document.getText().split(/\r?\n/);
 		this.tokensBuilder = new vsserv.SemanticTokensBuilder();
 		this.GetProperties(lines);

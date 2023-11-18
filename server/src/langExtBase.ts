@@ -117,7 +117,13 @@ export class LangExtBase
 	linkerCount = 0;
 	interpretation = 'source';
 	foundNode : Parser.SyntaxNode | null = null;
-	searchPos = vsserv.Position.create(0,0);
+	searchPos = vsserv.Position.create(0, 0);
+	searchTypes = new Array<string>();
+	searchText = new Array<string>();
+	replaceText = new Array<string>();
+	matches = new Set<number>();
+	buildString = '';
+	delta = 0;
 	constructor(TSInitResult : [Parser,Parser.Language], connection: Logger, settings: merlin6502Settings)
 	{
 		this.logger = connection;
@@ -281,17 +287,60 @@ export class LangExtBase
 		this.walk(tree,this.visit_find.bind(this),undefined);
 		return this.foundNode;
 	}
+	visit_replace(curs: Parser.TreeCursor): WalkerChoice {
+		const spaces = curs.startPosition.column + this.delta - this.buildString.length;
+		if (spaces>0)
+			this.buildString = this.buildString.padEnd(spaces + this.buildString.length);
+		for (let i = 0; i < this.searchText.length; i++) {
+			if (curs.nodeType == this.searchTypes[i] && curs.nodeText == this.searchText[i]) {
+				this.matches.add(i);
+				this.buildString += this.replaceText[i];
+				this.delta += this.replaceText[i].length - this.searchText[i].length;
+				return WalkerOptions.gotoSibling;
+			}
+		}
+		// append terminal nodes
+		if (curs.currentNode().namedChildCount == 0) {
+			this.buildString += curs.nodeText;
+			return WalkerOptions.gotoSibling;
+		}
+
+		return WalkerOptions.gotoChild;
+	}
+	/**
+	 * save state, make substitutions in line, then restore state
+	 * @param line 
+	 * @param macros 
+	 * @param find 
+	 * @param types 
+	 * @param repl 
+	 * @returns [updated line, set that was actually replaced]
+	 */
+	Substitute(line: string, macros: Set<string>, find: string[], types: string[], repl: string[]): [string, Set<number>] {
+		const oldRow = this.row;
+		const oldCol = this.col;
+		this.buildString = '';
+		this.delta = 0;
+		this.searchText = find;
+		this.searchTypes = types;
+		this.replaceText = repl;
+		this.matches = new Set<number>();
+		const tree = this.parse(this.adjust_line(line, macros), "\n");
+		this.walk(tree, this.visit_replace.bind(this), undefined);
+		this.row = oldRow;
+		this.col = oldCol;
+		return [this.buildString,this.matches];
+	}
 	/**
 	 * Look for match to a previously defined macro in column 2.
 	 * If there is a match insert unicode 0x100 at start of line.  This forces intepretation as an implicit macro call.
 	 * This is needed to emulate Merlin's contextual parsing rules.
-	 * @param lines array of strings with lines of code, line to be adjusted is `this.row`
+	 * @param line text of the line to adjust
 	 * @param macros map from macro names to arrays of label nodes, this can be from a running accumulation
 	*/
-	AdjustLine(lines: string[], macros: Set<string> | Map<string,LabelNode[]>) : string
+	adjust_line(programLine: string, macros: Set<string> | Map<string,LabelNode[]>) : string
 	{
 		// Doing this with regex only - have to be careful
-		const programLine = lines[this.row];
 		if (programLine.charAt(0)=='*' || programLine.charAt(0)==';')
 			return programLine;
 		const match = programLine.match(/\s+\S+/);
@@ -308,5 +357,11 @@ export class LangExtBase
 		}
 		this.col = -prefix.length;
 		return prefix + programLine;
+	}
+	/**
+	 * convenience function calling `adjust_line` based on `this.row`
+	*/
+	AdjustLine(lines: string[], macros: Set<string> | Map<string, LabelNode[]>): string {
+		return this.adjust_line(lines[this.row], macros);
 	}
 }
