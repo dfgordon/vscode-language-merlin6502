@@ -154,7 +154,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 				if (nodes)
 					for (const node of nodes)
 						if (lxbase.rangeContainsRange(node.rng, lxbase.curs_to_range(curs, this.row, this.col))) {
-							this.hover.push(MarkdownString("```\n" + node.macro_txt + "```"));
+							this.hover.push(MarkdownString("```\n" + node.expanded_mac + "```"));
 							return lxbase.WalkerOptions.exit;
 						}
 				this.hover.push(MarkdownString("expansion not found"));
@@ -162,9 +162,9 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 			}
 			if (curs.nodeType=='label_ref' && curs.currentNode().firstChild?.type=='global_label')
 			{
-				const pos_key = this.range.start.line * 1000 + this.range.start.character
 				if (!this.labelSet)
 					return lxbase.WalkerOptions.exit;
+				const pos_key = this.labelSet.encode_rng(this.range)
 				if (this.labelSet.macro_locals_pos.has(pos_key)) {
 					this.hover.push(MarkdownString("scoped to macro "+this.labelSet.macro_locals_pos.get(pos_key)));
 					return lxbase.WalkerOptions.exit;
@@ -212,7 +212,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 					return lxbase.WalkerOptions.exit;
 				} else if (inner == 'global_label') {
 					if (this.labelSet) {
-						const pos_key = this.range.start.line * 1000 + this.range.start.character
+						const pos_key = this.labelSet.encode_rng(this.range);
 						if (this.labelSet.macro_locals_pos.has(pos_key)) {
 							this.hover.push(MarkdownString("scoped to macro "+this.labelSet.macro_locals_pos.get(pos_key)));
 							return lxbase.WalkerOptions.exit;

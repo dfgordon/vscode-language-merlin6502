@@ -329,6 +329,8 @@ export class LangExtBase
 		this.walk(tree, this.visit_replace.bind(this), undefined);
 		this.row = oldRow;
 		this.col = oldCol;
+		if (this.buildString[0] == "\u0100")
+			this.buildString = this.buildString.substring(1);
 		return [this.buildString,this.matches];
 	}
 	/**
