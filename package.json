@@ -3,7 +3,7 @@
 	"displayName": "Merlin 6502",
 	"description": "Merlin assembly language for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
-	"version": "2.1.0",
+	"version": "2.2.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -99,7 +99,7 @@
 				"merlin6502.diagnostics.live": {
 					"type": "boolean",
 					"default": true,
-					"markdownDescription": "Update diagnostics on any document change.  If not, then only update on save document.  If you are editing large files it may be helpful to uncheck this."
+					"markdownDescription": "Update diagnostics on any document change.  When false, diagnostics only update on save, rescan, or activate."
 				},
 				"merlin6502.trace.server": {
 					"enum": [
@@ -215,7 +215,7 @@
 		"@types/vscode": "^1.75.0",
 		"@typescript-eslint/eslint-plugin": "^5.14.0",
 		"@typescript-eslint/parser": "^5.14.0",
-		"@vscode/test-electron": "^2.3.2",
+		"@vscode/test-electron": "^2.3.8",
 		"esbuild": "^0.17.19",
 		"eslint": "^8.41.0",
 		"glob": "^10.2.6",

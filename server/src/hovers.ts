@@ -150,7 +150,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 				return lxbase.WalkerOptions.exit;
 			}
 			if (curs.nodeType == 'macro_ref') {
-				let nodes = this.labelSet?.macros.get(curs.nodeText);
+				const nodes = this.labelSet?.macros.get(curs.nodeText);
 				if (nodes)
 					for (const node of nodes)
 						if (lxbase.rangeContainsRange(node.rng, lxbase.curs_to_range(curs, this.row, this.col))) {
@@ -169,7 +169,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 					this.hover.push(MarkdownString("scoped to macro "+this.labelSet.macro_locals_pos.get(pos_key)));
 					return lxbase.WalkerOptions.exit;
 				}
-				let nodes = this.labelSet.globals.get(curs.nodeText);
+				const nodes = this.labelSet.globals.get(curs.nodeText);
 				if (!nodes)
 					return lxbase.WalkerOptions.exit;
 				for (const node of nodes)

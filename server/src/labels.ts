@@ -147,7 +147,7 @@ class Scope {
 	endMac(line: number) {
 		while (this.macName.length > 0) {
 			this.macName.pop();
-			let lnode = this.macNode.pop();
+			const lnode = this.macNode.pop();
 			if (lnode)
 				lnode.macro_rng.end.line = line;
 		}
@@ -170,7 +170,7 @@ class Scope {
 		labels.macro_locals_pos.set(labels.encode_rng(rng),currMacroName);
 	}
 	registerRegularLocalDef(node: LabelNode, name: string) {
-		let currScopeNode = this.globNode[this.globNode.length - 1];
+		const currScopeNode = this.globNode[this.globNode.length - 1];
 		if (currScopeNode)
 			currScopeNode.children.push(new ChildLabel(node.doc.uri, node.rng, name));
 	}
@@ -210,12 +210,12 @@ export class LabelSentry
 	}
 	remove_label(txt: string, currDoc: vsserv.TextDocumentItem, rng: vsserv.Range, map: Map<string, Array<LabelNode>>)
 	{
-		let ary = map.get(txt);
+		const ary = map.get(txt);
 		if (!ary)
 			return;
-		let i = this.find_label(currDoc, rng, ary);
+		const i = this.find_label(currDoc, rng, ary);
 		if (i>=0) {
-			let last = ary.pop();
+			const last = ary.pop();
 			if (last && ary.length>i)
 				ary[i] = last;
 		}
@@ -228,10 +228,10 @@ export class LabelSentry
 	 */
 	substitute_vars(txt: string, nodes: Parser.SyntaxNode[]): [string,Set<number>] {
 		let ans = '';
-		let find = new Array<string>();
-		let types = new Array<string>();
-		let repl = new Array<string>();
-		let matches = new Set<number>();
+		const find = new Array<string>();
+		const types = new Array<string>();
+		const repl = new Array<string>();
+		const matches = new Set<number>();
 		for (let i = 0; i < nodes.length; i++) {
 			find.push(']' + (i + 1).toString());
 			types.push('var_mac');
@@ -268,17 +268,17 @@ export class LabelSentry
 			this.context.logger.log('expand: wrong node type');
 			return null;
 		}
-		let def = this.labels.macros.get(node.text);
+		const def = this.labels.macros.get(node.text);
 		if (!def || def.length==0) {
 			this.context.logger.log('expand: no def');
 			return null;
 		}
-		let def_node = def[0];
+		const def_node = def[0];
 		if (!def_node.isDef) {
 			this.context.logger.log('expand: def expected, ref found');
 			return null;
 		}
-		let next = node.nextNamedSibling;
+		const next = node.nextNamedSibling;
 		let matches = new Set<number>();
 		let arg_count = 0;
 		let expanded = '';
@@ -404,7 +404,7 @@ export class LabelSentry
 		return lxbase.WalkerOptions.gotoChild;
 	}
 	/** add diagnostics for file not found or multiple matches */
-	verify_include_path(curs: Parser.TreeCursor,currDoc: vsserv.TextDocumentItem)
+	verify_include_path(curs: Parser.TreeCursor)
 	{
 		if (!this.context)
 			return;
@@ -507,9 +507,9 @@ export class LabelSentry
 			else {
 				// TODO: treat macro expansion as a descent document like the includes,
 				// but with a buffer-like URI
-				let nodes = this.labels.macros.get(curr.text);
+				const nodes = this.labels.macros.get(curr.text);
 				if (nodes) {
-					let node = this.find_label(currDoc, rng, nodes);
+					const node = this.find_label(currDoc, rng, nodes);
 					if (node >= 0) {
 						//this.context.logger.log("expanding " + curr.text);
 						const xp = this.expand_macro(curr);
@@ -521,7 +521,7 @@ export class LabelSentry
 		else if (curr.type == "psop_use" || curr.type == "psop_put")
 		{
 			const psop = curr.type.substring(5, 8).toUpperCase();
-			this.verify_include_path(curs, currDoc);
+			this.verify_include_path(curs);
 			if (currCtx != lxbase.SourceOptions.master)
 				this.diag.add(vsserv.Diagnostic.create(rng, 'recursive '+psop+' is not allowed', vsserv.DiagnosticSeverity.Error));
 			else

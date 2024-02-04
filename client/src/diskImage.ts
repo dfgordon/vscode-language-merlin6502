@@ -9,27 +9,6 @@ function abortMessage() {
 	vscode.window.showInformationMessage('disk image operation aborted by user');
 }
 
-/**
- * return a range that expands the selection minimally to encompass complete lines
- * @param textEditor the editor with the range to analyze
- * @returns either a range, or undefined if there was none
- */
-function extended_selection(textEditor: vscode.TextEditor) : vscode.Range | undefined
-{
-	const sel = textEditor.selection;
-	if (!sel.isEmpty)
-	{
-		const ext_start = new vscode.Position(sel.start.line,0);
-		let ext_end = undefined;
-		if (sel.end.character==0)
-			ext_end = textEditor.document.lineAt(sel.end.line-1).range.end;
-		else
-			ext_end = textEditor.document.lineAt(sel.end.line).range.end;
-		return new vscode.Range(ext_start,ext_end);
-	}
-	return undefined;
-}
-
 interface FileImageType {
 	fimg_version: string;
 	file_system: string;
@@ -161,8 +140,8 @@ export class A2KitTool
 		process.stdout.on('data', async (data) => {
 			this.resultBytes = Buffer.concat([this.resultBytes,data]);
 		});
-		process.on('error', async (err) => {
-			vscode.window.showErrorMessage("error spawning a2kit, is it installed and in the path?");
+		process.on('error', async (err: Error) => {
+			vscode.window.showErrorMessage("error spawning a2kit, is it installed and in the path? <" + err.message + ">");
 		});
 		process.on('close', async (exitCode) => {
 			if (exitCode == 0) {
@@ -191,8 +170,8 @@ export class A2KitTool
 			const str_output = `${data}`;
 			this.resultString += str_output;
 		});
-		process.on('error', async (err) => {
-			vscode.window.showErrorMessage("error spawning a2kit, is it installed and in the path?");
+		process.on('error', async (err: Error) => {
+			vscode.window.showErrorMessage("error spawning a2kit, is it installed and in the path? <" + err.message + ">");
 		});
 		process.on('close', async (exitCode) => {
 			if (exitCode == 0) {
@@ -242,17 +221,14 @@ export class A2KitTool
 	async insert_code(txt: string) {
 		const verified = lxbase.verify_document();
 		if (verified) {
-			const r = extended_selection(verified.ed);
-			let rng: vsclnt.Range | null;
-			if (r)
-				rng = vsclnt.Range.create(r.start, r.end);
-			else
-				rng = null;
 			verified.ed.edit(edit => { edit.replace(verified.ed.selection, txt); });
 		}
 	}
 	finish_put(txt: string) {
-		vscode.window.showInformationMessage(this.imgPath[this.imgPath.length-1]+" saved to disk image");
+		vscode.window.showInformationMessage(this.imgPath[this.imgPath.length - 1] + " saved to disk image");
+		if (txt.length > 0) {
+			vscode.window.showWarningMessage("output from `put` was not empty: " + txt);
+		}
 	}
 	async save_code(buf: Buffer) {
 		this.a2kit_bin2txt(["put", "-d", this.fsPath, "-f", this.imgPath[this.imgPath.length - 1], "-t", "mtok"], this.finish_put.bind(this), buf);
@@ -265,7 +241,13 @@ export class A2KitTool
 			return 'address is out of range (2049 - 49143)';
 		return null;
 	}
-	async tokenize(dummy: string) {
+	async tokenize(prev_out: string) {
+		if (prev_out.length > 0) {
+			const res = await vscode.window.showWarningMessage("Unexpected output before tokenization: " + prev_out, 'Proceed', 'Cancel');
+			if (res != 'Proceed') {
+				return;
+			}
+		}
 		const verified = lxbase.verify_document();
 		if (verified) {
 			const tokens: number[] = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
@@ -279,7 +261,7 @@ export class A2KitTool
 			this.save_code(Buffer.from(Uint8Array.from(tokens)));
 		}
 		else
-			vscode.window.showErrorMessage("could not find document tokenize");
+			vscode.window.showErrorMessage("could not find document to tokenize");
 	}
 	async detokenize(tokens: Buffer) {
 		const img_messg = Array.from(Uint8Array.from(tokens));

@@ -358,7 +358,6 @@ export class DiagnosticProvider
 			if (curs.nodeType == "psop_use" || curs.nodeType == "psop_put")
 			{
 				const currCtx = this.context.stack.ctx[this.context.stack.ctx.length - 1];
-				const psop = curs.nodeType.substring(5, 8).toUpperCase();
 				if (currCtx == lxbase.SourceOptions.master)
 					return lxbase.WalkerOptions.gotoInclude;
 			}

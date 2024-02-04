@@ -6,7 +6,7 @@ import * as hov from './hovers';
 import * as compl from './completions';
 import * as tok from './semanticTokens';
 import { AnalysisStack, MerlinContext } from './workspace';
-import {LabelSentry, LabelNode, LabelSet} from './labels';
+import { LabelSentry, LabelNode, LabelSet } from './labels';
 import * as lxbase from './langExtBase';
 import * as Parser from 'web-tree-sitter';
 import { defaultSettings } from './settings';
@@ -34,8 +34,7 @@ const logger: lxbase.Logger = connection.console;
 // Create a simple text document manager.
 const windowDocs = new vsserv.TextDocuments(vsdoc.TextDocument);
 
-async function startServer()
-{
+async function startServer() {
 	windowDocs.listen(connection);
 	connection.listen();
 	TSInitResult = await lxbase.TreeSitterInit();
@@ -80,7 +79,7 @@ connection.onInitialize((params: vsserv.InitializeParams) => {
 			textDocumentSync: vsserv.TextDocumentSyncKind.Full,
 			completionProvider: {
 				resolveProvider: false,
-				triggerCharacters: ['$',':',']','(','[',',']
+				triggerCharacters: ['$', ':', ']', '(', '[', ',']
 			},
 			semanticTokensProvider: { range: true, full: true, documentSelector: ['merlin6502'], legend: tok.legend },
 			declarationProvider: true,
@@ -149,12 +148,12 @@ connection.onRequest(vsserv.SemanticTokensRangeRequest.type, (params: vsserv.Sem
 	const doc = windowDocs.get(params.textDocument.uri);
 	if (!doc)
 		return null;
-	return tokens.provideDocumentRangeSemanticTokens(doc,params.range);
+	return tokens.provideDocumentRangeSemanticTokens(doc, params.range);
 });
 
 // Document symbol handling
 
-function declarationsFromMap(map: Map<string,LabelNode[]>, params: vsserv.DefinitionParams): Array<vsserv.Location> | undefined {
+function declarationsFromMap(map: Map<string, LabelNode[]>, params: vsserv.DefinitionParams): Array<vsserv.Location> | undefined {
 	for (const vars of map.values()) {
 		const ans = new Array<vsserv.Location>();
 		let clicked = false;
@@ -168,8 +167,8 @@ function declarationsFromMap(map: Map<string,LabelNode[]>, params: vsserv.Defini
 	}
 }
 
-function definitionsFromMap(map: Map<string,LabelNode[]>, params: vsserv.DefinitionParams): Array<vsserv.Location> | undefined {
-	for (const [key,vars] of map) {
+function definitionsFromMap(map: Map<string, LabelNode[]>, params: vsserv.DefinitionParams): Array<vsserv.Location> | undefined {
+	for (const vars of map.values()) {
 		const ans = new Array<vsserv.Location>();
 		let clicked = false;
 		for (const node of vars) {
@@ -183,7 +182,7 @@ function definitionsFromMap(map: Map<string,LabelNode[]>, params: vsserv.Definit
 	}
 }
 
-function referencesFromMap(map: Map<string,LabelNode[]>, params: vsserv.ReferenceParams): Array<vsserv.Location> | undefined {
+function referencesFromMap(map: Map<string, LabelNode[]>, params: vsserv.ReferenceParams): Array<vsserv.Location> | undefined {
 	for (const vars of map.values()) {
 		const ans = new Array<vsserv.Location>();
 		let clicked = false;
@@ -197,7 +196,7 @@ function referencesFromMap(map: Map<string,LabelNode[]>, params: vsserv.Referenc
 	}
 }
 
-function renamableFromMap(map: Map<string,LabelNode[]>, params: vsserv.RenameParams): string | undefined {
+function renamableFromMap(map: Map<string, LabelNode[]>, params: vsserv.RenameParams): string | undefined {
 	for (const [name, vars] of map) {
 		let clicked = false;
 		for (const node of vars) {
@@ -301,7 +300,7 @@ connection.onRenameRequest((params: vsserv.RenameParams): vsserv.WorkspaceEdit |
 		const name = renamableFromMap(map, params);
 		if (name) {
 			const edits = new Array<vsserv.TextDocumentEdit>();
-			const edmap = new Map<string,Array<vsserv.TextEdit>>();
+			const edmap = new Map<string, Array<vsserv.TextEdit>>();
 			const lnodes = map.get(name);
 			if (lnodes) {
 				for (const node of lnodes) {
@@ -324,37 +323,34 @@ connection.onRenameRequest((params: vsserv.RenameParams): vsserv.WorkspaceEdit |
 // Hovers and Completions
 
 connection.onHover(params => {
-	if (hoverTool)
-	{
+	if (hoverTool) {
 		return hoverTool.provideHover(windowDocs.get(params.textDocument.uri), params.position);
 	}
 });
 
 connection.onCompletion((params: vsserv.CompletionParams): vsserv.CompletionItem[] => {
 	let ans = new Array<vsserv.CompletionItem>();
-	if (codeTool)
-	{
-		ans = ans.concat(codeTool.provideCompletionItems(windowDocs.get(params.textDocument.uri), params.position, params.context?.triggerCharacter));	
+	if (codeTool) {
+		ans = ans.concat(codeTool.provideCompletionItems(windowDocs.get(params.textDocument.uri), params.position, params.context?.triggerCharacter));
 	}
-	if (addressTool && params.context?.triggerCharacter=='$')
-	{
-		ans = ans.concat(addressTool.provideCompletionItems(windowDocs.get(params.textDocument.uri), params.position));	
+	if (addressTool && params.context?.triggerCharacter == '$') {
+		ans = ans.concat(addressTool.provideCompletionItems(windowDocs.get(params.textDocument.uri), params.position));
 	}
 	return ans;
 });
 
 // Commands and Formatting
 
-connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise<any> => {
+connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise<string | string[] | number[] | undefined> => {
 	await waitForInit();
 	let labelSet: LabelSet | undefined = undefined;
 	if (["merlin6502.pasteFormat", "merlin6502.tokenize"].includes(params.command)) {
 		if (params.arguments) {
-			const lines : string[] = params.arguments[0];
+			const lines: string[] = params.arguments[0];
 			const uri: string = params.arguments[1];
 			labelSet = labels.shared.get(uri);
 			let tries = 0;
-			while (!labelSet && tries<20) {
+			while (!labelSet && tries < 20) {
 				await new Promise(resolve => setTimeout(resolve, 50));
 				labelSet = labels.shared.get(uri);
 				tries += 1;
@@ -365,12 +361,12 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 				return formatter.formatForPaste(lines, labelSet.macros);
 			else if (params.command == 'merlin6502.tokenize')
 				return tokenizer.tokenize(lines, labelSet.macros);
-		}		
+		}
 	}
 	else if (params.command == 'merlin6502.disassemble') {
 		if (params.arguments) {
 			const img: number[] = params.arguments[0];
-			const disassemblyParams : comm.DisassemblyParams = params.arguments[1];
+			const disassemblyParams: comm.DisassemblyParams = params.arguments[1];
 			const result = disassembler.disassemble(img, disassemblyParams);
 			return result;
 		}
@@ -384,7 +380,7 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 			//logger.log("looping to find " + params.arguments[0]);
 			for (const doc of context.docs) {
 				if (doc.uri == params.arguments[0]) {
-					let master = context.get_master(doc);
+					const master = context.get_master(doc);
 					if (context.stack.doc.length == 0 || master.uri != context.stack.doc[0].uri) {
 						logger.log("rescan and analyze " + doc.uri);
 						context.rescan_entries = true;
@@ -416,7 +412,7 @@ connection.onExecuteCommand(async (params: vsserv.ExecuteCommandParams): Promise
 	}
 	else if (params.command == 'merlin6502.getMasterList') {
 		if (params.arguments) {
-			let ans = new Array<string>();
+			const ans = new Array<string>();
 			const includeKey = path.basename(params.arguments[0], ".S");
 			const putSet = context.put_map.get(includeKey);
 			if (putSet)
@@ -483,18 +479,20 @@ windowDocs.onDidOpen(async params => {
 	await waitForInit();
 	await getAllWorkspaceDocs();
 	const doc = params.document;
-	validateTextDocument(vsserv.TextDocumentItem.create(doc.uri,'merlin6502',doc.version,doc.getText()));
+	validateTextDocument(vsserv.TextDocumentItem.create(doc.uri, 'merlin6502', doc.version, doc.getText()));
 });
 
 windowDocs.onDidSave(async listener => {
 	await waitForInit();
 	await getAllWorkspaceDocs();
 	const doc = listener.document;
-	validateTextDocument(vsserv.TextDocumentItem.create(doc.uri,'merlin6502',doc.version,doc.getText()));
+	validateTextDocument(vsserv.TextDocumentItem.create(doc.uri, 'merlin6502', doc.version, doc.getText()));
 });
 
 windowDocs.onDidChangeContent(async change => {
 	await waitForInit();
+	if (!globalSettings.diagnostics.live)
+		return;
 	if (context.rescan_entries) {
 		await getAllWorkspaceDocs();
 	} else {

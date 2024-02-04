@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest update*: macro expansion hovers, argument checks
+*latest update*: pseudo-op snippets, enable live diagnostics (un)setting, linting
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
@@ -130,13 +130,15 @@ You can access files on a disk image.  In order to do this you must install `a2k
 
 * `merlin6502: Save to disk image`: After choosing the image file, use the mini-menu to traverse the image's directory tree (if applicable) and select a directory (`.` selects the current level).  Enter the name that the saved file will be given on the disk image.  If the file already exists you must respond to a warning.  The saved file will be encoded as a Merlin source file.
 
+Another way to access disk images directly from VS Code is using the `Disk Image Notebook` extension.
+
 ## Troubleshooting Tips
 
 * VS Code
     - the language server has trouble with untitled documents; when creating a new document save it early
     - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
     - tab your way to the end of snippets
-    - to mitigate diagnostic delay, break large source files into smaller modules
+    - to mitigate diagnostic delay, break large source files into smaller modules, or adjust live diagnostics setting
     - if symbol information doesn't load try forcing a diagnostic update
 * Disk Images
     - update a2kit from time to time

@@ -1,4 +1,3 @@
-import { assert } from 'console';
 import * as vsserv from 'vscode-languageserver/node';
 import * as a2map from 'a2-memory-map';
 
@@ -55,9 +54,9 @@ export class AddressHovers
 	{
 		this.amap = new Map<number,Array<Array<vsserv.MarkupContent>>>();
 		
-		for (const [key,obj] of a2map.get_all())
+		for (const key of a2map.get_all().keys())
 		{
-			let addr = parseInt(key);
+			const addr = parseInt(key);
 			if (!isNaN(addr))
 			{
 				const contexts = a2map.get_one_and_split(addr);

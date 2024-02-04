@@ -112,7 +112,7 @@ export class RescanTool
 	}
 	rescan()
 	{
-		let verified = lxbase.verify_document();
+		const verified = lxbase.verify_document();
 		if (!verified)
 			return;
 		client.sendRequest(vsclnt.ExecuteCommandRequest.type,
@@ -185,30 +185,29 @@ export class DisassemblyTool
 		if (!uri)
 			return;
 		const yamlString = fs.readFileSync(uri[0].fsPath,'utf8');
-		const yamlTree : any = YAML.parseAllDocuments(yamlString,{uniqueKeys: false,schema: "failsafe"})[0];
-		if (yamlTree.errors.length>0)
-		{
-			vscode.window.showErrorMessage('Failed to parse YAML');
-			return;
+		const yamlTree = YAML.parseAllDocuments(yamlString,{uniqueKeys: false,schema: "failsafe"})[0];
+		if (yamlTree.errors.length == 0 && YAML.isMap(yamlTree.contents)) {
+			// The following gets two values with the same key by assuming an ordering.
+			// We are forced to do this inadvisable thing due to the way AppleWin creates the YAML.
+			const mainString = yamlTree.contents.items[1].toString();
+			const auxString = yamlTree.contents.items[2].toString();
+			const block64Map = JSON.parse(mainString)['Unit']['State']['Main Memory'];
+			const block64MapAux = JSON.parse(auxString)['Unit']['State']['State']['Auxiliary Memory Bank00'];
+			if (!block64Map) {
+				vscode.window.showErrorMessage('Could not find main memory keys in YAML file');
+				return;
+			}
+			if (!block64MapAux) {
+				vscode.window.showErrorMessage('Could not find aux memory keys in YAML file');
+				return;
+			}
+			// n.b. if AppleWin ever changes the format of the keys we may need to provide sorting function
+			const mainMemList = (Object.entries(block64Map) as [string, string][]).sort();
+			const auxMemList = (Object.entries(block64MapAux) as [string, string][]).sort();
+			return [mainMemList, auxMemList];
 		}
-		const mainString = yamlTree.contents.items[1].toString();
-		const auxString = yamlTree.contents.items[2].toString();
-		const block64Map = JSON.parse(mainString)['Unit']['State']['Main Memory'];
-		const block64MapAux = JSON.parse(auxString)['Unit']['State']['State']['Auxiliary Memory Bank00'];
-		if (!block64Map)
-		{
-			vscode.window.showErrorMessage('Could not find main memory keys in YAML file');
-			return;
-		}
-		if (!block64MapAux)
-		{
-			vscode.window.showErrorMessage('Could not find aux memory keys in YAML file');
-			return;
-		}
-		// n.b. if AppleWin ever changes the format of the keys we may need to provide sorting function
-		const mainMemList = (Object.entries(block64Map) as [string,string][]).sort();
-		const auxMemList = (Object.entries(block64MapAux) as [string,string][]).sort();
-		return [mainMemList,auxMemList];
+		vscode.window.showErrorMessage('Failed to parse YAML');
+		return;
 	}
 	async insertCode(params:DisassemblyParams,img:Buffer,auxZP:Buffer|undefined)
 	{
@@ -254,15 +253,27 @@ export class DisassemblyTool
 		"title": "Insert from AppleWin State"
 		}).then(uri => {
 			const res = this.openAppleWinSaveState(uri);
-			if (!res)
+			if (!res) {
+				// error message already given
 				return;
+			}
 			const [main,aux] = res;
 			const buffList = new Array<Buffer>();
-			for (const [addr,hexRow] of main)
-				buffList.push(Buffer.from(hexRow,"hex"));
+			let last_addr = -1;
+			for (const [addr, hexRow] of main) {
+				const curr_addr = parseInt(addr, 16);
+				if (curr_addr < last_addr) {
+					vscode.window.showErrorMessage("sanity check failed while parsing save state's main memory");
+					return;
+				}
+				buffList.push(Buffer.from(hexRow, "hex"));
+				last_addr = curr_addr;
+			}
 			const zpRow = aux[0][1];
-			if (!zpRow)
+			if (!zpRow) {
+				vscode.window.showErrorMessage("could not load auxilliary zero page from save state");
 				return;
+			}
 			this.insertCode(params,Buffer.concat(buffList),Buffer.from(zpRow,"hex"));
 		});
 	}
