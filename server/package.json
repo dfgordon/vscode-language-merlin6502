@@ -1,7 +1,7 @@
 {
 	"name": "vscode-language-merlin6502-server",
 	"description": "Language server for Merlin assembly language",
-	"version": "2.2.0",
+	"version": "2.2.1",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
