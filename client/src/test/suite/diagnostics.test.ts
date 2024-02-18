@@ -34,7 +34,7 @@ async function diagnosticTester(progName: string, expectedMessages: RegExp[]) {
 
 describe('Diagnostics: Processors', function () {
 	it('65c02 disabled', async function () {
-		this.timeout(4000); // first one may take a while
+		this.timeout(8000); // first one may take a while
 		const v = vscode.workspace.getConfiguration('merlin6502')?.get('version');
 		if (v && v == 'Merlin 8')
 			await diagnosticTester('test-65c02-disabled.S', [
