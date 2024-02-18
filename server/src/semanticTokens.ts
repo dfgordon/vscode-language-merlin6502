@@ -42,7 +42,7 @@ export class TokenProvider extends lxbase.LangExtBase
 			this.tokensBuilder.push(...pos,...tokType('macro'));
 			return lxbase.WalkerOptions.gotoSibling;
 		}
-		if (curs.nodeType == "global_label" && this.macro_locals_pos.has(1000*pos[0] + pos[1]))
+		if (curs.nodeType == "global_label" && this.macro_locals_pos.has(lxbase.pos_to_key(rng)))
 		{
 			this.tokensBuilder.push(...pos, ...tokType('parameter'));
 			return lxbase.WalkerOptions.gotoSibling;

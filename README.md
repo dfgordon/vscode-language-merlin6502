@@ -4,7 +4,7 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest update*: pseudo-op snippets, enable live diagnostics (un)setting, linting
+*latest update*: fix bug where globals could be wrongly identified as macro locals
 
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace

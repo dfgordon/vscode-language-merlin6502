@@ -107,12 +107,6 @@ export class LabelSet
 	macros = new Map<string, Array<LabelNode>>();
 	macro_locals = new Map<string, Array<LabelNode>>();
 	macro_locals_pos = new Map<number, string>();
-	/** encode node range as a single number for hashing; for all current
-	 * purposes it is sufficient to use only the start position.
-	 */
-	encode_rng(rng: vsserv.Range): number {
-		return rng.start.line * 1000 + rng.start.character;
-	}
 }
 
 /** Class to manage scopes.  The global scope determines the scope of locals,
@@ -121,10 +115,14 @@ export class LabelSet
  * and for triggering storage of macro ranges for later expansion.
  */
 class Scope {
+	displayDoc = "";
 	macName = new Array<string>();
 	macNode = new Array<LabelNode | null>();
 	globName = new Array<string>();
 	globNode = new Array<LabelNode | null>();
+	constructor(uri: string) {
+		this.displayDoc = uri;
+	}
 	inMacro() {
 		return this.macName.length > 0;
 	}
@@ -161,13 +159,15 @@ class Scope {
 	registerMacroLocalDef(labels: LabelSet, node: LabelNode, name: string) {
 		const currMacroNode = this.macNode[this.macNode.length - 1];
 		const currMacroName = this.macName[this.macName.length - 1];
-		labels.macro_locals_pos.set(labels.encode_rng(node.rng), currMacroName);
+		if (this.displayDoc==node.doc.uri)
+			labels.macro_locals_pos.set(lxbase.pos_to_key(node.rng), currMacroName);
 		if (currMacroNode)
 			currMacroNode.children.push(new ChildLabel(node.doc.uri, node.rng, name));
 	}
-	registerMacroLocalRef(labels: LabelSet, rng: vsserv.Range) {
+	registerMacroLocalRef(labels: LabelSet, uri: string, rng: vsserv.Range) {
 		const currMacroName = this.macName[this.macName.length - 1];
-		labels.macro_locals_pos.set(labels.encode_rng(rng),currMacroName);
+		if (this.displayDoc==uri)
+			labels.macro_locals_pos.set(lxbase.pos_to_key(rng),currMacroName);
 	}
 	registerRegularLocalDef(node: LabelNode, name: string) {
 		const currScopeNode = this.globNode[this.globNode.length - 1];
@@ -191,7 +191,7 @@ export class LabelSentry
 	/** needed for forward referencing rules */
 	runningVars = new Set<string>();
 	/** manage scopes */
-	scope = new Scope;
+	scope = new Scope("");
 	constructor(ctx: MerlinContext, diag: DiagnosticSet)
 	{
 		this.context = ctx;
@@ -443,7 +443,7 @@ export class LabelSentry
 				if (Defined(macroLocalExt, this.labels.macro_locals)) {
 					this.remove_label(curr.text, currDoc, rng, this.labels.globals);
 					AddLabel(macroLocalExt, new LabelNode(currDoc, curr, rng), this.labels.macro_locals);
-					this.scope.registerMacroLocalRef(this.labels, rng);
+					this.scope.registerMacroLocalRef(this.labels, currDoc.uri, rng);
 				}
 				else if (!Defined(curr.text, this.labels.globals))
 					this.diag.add(vsserv.Diagnostic.create(rng, 'global label is undefined', vsserv.DiagnosticSeverity.Error));
@@ -539,7 +539,7 @@ export class LabelSentry
 	}
 	/**
 	 * build the label set associated with a master document
-	 * @param document this can be the document being displayed, if not a master, the master will be found
+	 * @param document this can and should be the document being displayed, if not a master, the master will be found
 	 */
 	build_main(document: vsserv.TextDocumentItem,ctx: MerlinContext)
 	{
@@ -547,20 +547,20 @@ export class LabelSentry
 		this.labels = new LabelSet();
 		this.runningMacros = new Set<string>();
 		this.runningVars = new Set<string>();
-		this.scope = new Scope();
+		this.scope = new Scope(document.uri);
 		this.diag = new DiagnosticSet;
 		this.context.analyze(document, this.runningMacros, this.visit_gather.bind(this));
 	}
 	/**
 	 * verify the label set associated with a document, assumes label set has been built
-	 * @param document this can be the document being displayed, if not a master, the master will be found
+	 * @param document this can and should be the document being displayed, if not a master, the master will be found
 	 */
 	verify_main(document: vsserv.TextDocumentItem,ctx: MerlinContext)
 	{
 		this.context = ctx;
 		this.runningMacros = new Set<string>();
 		this.runningVars = new Set<string>();
-		this.scope = new Scope();
+		this.scope = new Scope(document.uri);
 		this.context.analyze(document, this.runningMacros, this.visit_verify.bind(this));
 		// correlate EXT and ENT
 		for (const [lbl, lst] of this.labels.globals)

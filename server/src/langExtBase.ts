@@ -6,6 +6,14 @@ import * as opcodes from './opcodes.json';
 import * as pseudo from './pseudo_opcodes.json';
 import { LabelNode } from './labels';
 
+/** Simple way to make position hashable
+ * assuming <1000 characters per line.
+ * Lookups must be scoped to a single document.
+ */
+export function pos_to_key(rng: vsserv.Range): number {
+	return rng.start.line * 1000 + rng.start.character;
+}
+
 export function curs_to_range(curs: Parser.TreeCursor, rowOffset: number, colOffset: number): vsserv.Range
 {
 	const coff1 = curs.startPosition.column + colOffset < 0 ? 0 : colOffset;

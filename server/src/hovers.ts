@@ -164,7 +164,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 			{
 				if (!this.labelSet)
 					return lxbase.WalkerOptions.exit;
-				const pos_key = this.labelSet.encode_rng(this.range)
+				const pos_key = lxbase.pos_to_key(this.range)
 				if (this.labelSet.macro_locals_pos.has(pos_key)) {
 					this.hover.push(MarkdownString("scoped to macro "+this.labelSet.macro_locals_pos.get(pos_key)));
 					return lxbase.WalkerOptions.exit;
@@ -212,7 +212,7 @@ add `>` to right justify in 5 column field, e.g. `#'>`"));
 					return lxbase.WalkerOptions.exit;
 				} else if (inner == 'global_label') {
 					if (this.labelSet) {
-						const pos_key = this.labelSet.encode_rng(this.range);
+						const pos_key = lxbase.pos_to_key(this.range);
 						if (this.labelSet.macro_locals_pos.has(pos_key)) {
 							this.hover.push(MarkdownString("scoped to macro "+this.labelSet.macro_locals_pos.get(pos_key)));
 							return lxbase.WalkerOptions.exit;
