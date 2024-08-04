@@ -12,7 +12,7 @@ async function testFormat(progName: string, expectedCode: string) {
 	if (!ed)
 		assert.fail('no active text editor');
 	let actualCode: string = await vscode.commands.executeCommand("merlin6502.format");
-	actualCode = actualCode.replace("\r\n", "\n");
+	actualCode = actualCode.replace(/\r\n/g, "\n");
 	assert.strictEqual(actualCode,expectedCode);
 }
 
