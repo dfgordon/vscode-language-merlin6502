@@ -11,7 +11,8 @@ async function testFormat(progName: string, expectedCode: string) {
 	vscode.languages.setTextDocumentLanguage(doc, 'merlin6502');
 	if (!ed)
 		assert.fail('no active text editor');
-	const actualCode = await vscode.commands.executeCommand("merlin6502.format");
+	let actualCode: string = await vscode.commands.executeCommand("merlin6502.format");
+	actualCode = actualCode.replace("\r\n", "\n");
 	assert.strictEqual(actualCode,expectedCode);
 }
 

@@ -7,8 +7,8 @@
 * Language server is native rust code
 * Expanded language diagnostics
     - better handling of 16 bit syntax
-    - illegal forward references
-    - checks folding sections (DO, LUP, etc.)
+    - checks illegal forward references
+    - checks and provides folding sections (DO, LUP, etc.)
     - others
 * Disk image support is bundled, no need for external `a2kit` installation
 * Better disassembly, finds various data patterns, user can set MX
