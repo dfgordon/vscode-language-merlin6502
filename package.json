@@ -3,7 +3,7 @@
 	"displayName": "Merlin 6502",
 	"description": "Merlin assembly language for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
-	"version": "2.2.1",
+	"version": "3.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -21,15 +21,20 @@
 		"configuration": {
 			"title": "Merlin 6502",
 			"properties": {
-				"merlin6502.case.caseSensitive": {
-					"type": "boolean",
-					"default": false,
-					"description": "Lower case mnemonics are considered an error."
+				"merlin6502.version": {
+					"enum": [
+						"Merlin 8",
+						"Merlin 16",
+						"Merlin 16+",
+						"Merlin 32"
+					],
+					"default": "Merlin 8",
+					"markdownDescription": "Accept syntax for this version of Merlin"
 				},
-				"merlin6502.case.lowerCaseCompletions": {
-					"type": "boolean",
-					"default": false,
-					"markdownDescription": "Use lower case in completions and snippets (ingored if `#merlin6502.caseSensitive#`)."
+				"merlin6502.flag.caseSensitive": {
+					"enum": ["ignore","info","warn","error"],
+					"default": "ignore",
+					"description": "Flag lower case mnemonics."
 				},
 				"merlin6502.columns.c1": {
 					"type": "number",
@@ -49,32 +54,12 @@
 					"minimum": 1,
 					"markdownDescription": "Width of the operand column to use in formatting"
 				},
-				"merlin6502.version": {
-					"enum": [
-						"Merlin 8",
-						"Merlin 16",
-						"Merlin 16+",
-						"Merlin 32"
-					],
-					"default": "Merlin 8",
-					"markdownDescription": "Accept syntax for this version of Merlin"
-				},
 				"merlin6502.linker.detect": {
 					"type": "number",
 					"default": 0.1,
 					"minimum": 0,
 					"maximum": 1,
 					"markdownDescription": "Threshold to trigger interpretation as a linker command file.  This is the ratio of occurrences of ASM, LNK, or LKV, to lines in the document."
-				},
-				"merlin6502.completions.ibas": {
-					"type": "boolean",
-					"default": false,
-					"markdownDescription": "Offer address completions applicable to Integer BASIC"
-				},
-				"merlin6502.completions.abas": {
-					"type": "boolean",
-					"default": true,
-					"markdownDescription": "Offer address completions applicable to Applesoft BASIC"
 				},
 				"merlin6502.hovers.specialAddresses": {
 					"type": "boolean",
@@ -91,6 +76,21 @@
 					"default": true,
 					"markdownDescription": "Show hovers for pseudo-opcode mnemonics such as `EQU`, `ASC`, etc."
 				},
+				"merlin6502.completions.lowerCase": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Use lower case in completions and snippets (ingored if case sensitive)."
+				},
+				"merlin6502.completions.ibas": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Offer address completions applicable to Integer BASIC"
+				},
+				"merlin6502.completions.abas": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Offer address completions applicable to Applesoft BASIC"
+				},
 				"merlin6502.disassembly.brk": {
 					"type": "boolean",
 					"default": false,
@@ -100,14 +100,6 @@
 					"type": "boolean",
 					"default": true,
 					"markdownDescription": "Update diagnostics on any document change.  When false, diagnostics only update on save, rescan, or activate."
-				},
-				"merlin6502.trace.server": {
-					"enum": [
-						"verbose",
-						"silent"
-					],
-					"default": "silent",
-					"markdownDescription": "Logging level for client/server messages"
 				}
 			}
 		},
@@ -126,10 +118,6 @@
 			{
 				"command": "merlin6502.format",
 				"title": "merlin6502: Format for copy and paste into Merlin 8"
-			},
-			{
-				"command": "merlin6502.columns",
-				"title": "merlin6502: Resize columns"
 			},
 			{
 				"command": "merlin6502.getFrontVii",
@@ -154,16 +142,16 @@
 			{
 				"command": "merlin6502.rescan",
 				"title": "merlin6502: Rescan modules and includes"
+			},
+			{
+				"command": "merlin6502.toData",
+				"title": "merlin6502: Convert code lines to data lines"
 			}
 		],
 		"menus": {
 			"commandPalette": [
 				{
 					"command": "merlin6502.format",
-					"when": "editorLangId == merlin6502"
-				},
-				{
-					"command": "merlin6502.columns",
 					"when": "editorLangId == merlin6502"
 				},
 				{
@@ -189,24 +177,24 @@
 				{
 					"command": "merlin6502.rescan",
 					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.toData",
+					"title": "editorLangId == merlin6502"
 				}
 			]
 		}
 	},
 	"scripts": {
 		"reset-client": "run-script-os",
-		"reset-server": "run-script-os",
-		"reset-client:windows": "npx rimraf client\\out && mkdir client\\out && copy client\\src\\*.scpt client\\out",
-		"reset-client:default": "npx rimraf client/out && mkdir client/out && cp client/src/*.scpt client/out",
-		"reset-server:windows": "npx rimraf server\\out && mkdir server\\out && copy server\\src\\*.wasm server\\out",
-		"reset-server:default": "npx rimraf server/out && mkdir server/out && cp server/src/*.wasm server/out",
-		"vscode:prepublish": "npm run esbuild-client -- --minify && npm run esbuild-server -- --minify",
+		"reset-client:windows": "npx rimraf client\\out && mkdir client\\out",
+		"reset-client:default": "npx rimraf client/out && mkdir client/out",
+		"vscode:prepublish": "npm run esbuild-client -- --minify",
 		"esbuild-client": "npm run reset-client && esbuild ./client/src/extension.ts --bundle --outfile=client/out/extension.js --external:vscode --format=cjs --platform=node",
-		"esbuild-server": "npm run reset-server && esbuild ./server/src/server.ts --bundle --outfile=server/out/server.js --external:vscode --format=cjs --platform=node",
-		"build": "npm run esbuild-client -- --sourcemap && npm run esbuild-server -- --sourcemap",
+		"build": "npm run esbuild-client -- --sourcemap",
 		"lint": "eslint . --ext .ts,.tsx",
-		"test-compile": "npm run reset-client && tsc -p ./client/ && npm run reset-server && tsc -p ./server/",
-		"test": "node ./server/out/test/runTest.js && node ./client/out/test/runTest.js"
+		"test-compile": "npm run reset-client && tsc -p ./client/",
+		"test": "node ./client/out/test/runTest.js"
 	},
 	"devDependencies": {
 		"@types/glob": "^8.1.0",

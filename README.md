@@ -4,15 +4,13 @@
 
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
-*latest update*: fix bug where globals could be wrongly identified as macro locals
-
 * Conforms to choice of Merlin version and processor target
 * Resolves labels across project workspace
 * Comprehensive highlights, completions, and hovers
 * Completions and hovers for Apple II soft switches, ROM routines, etc.
 * Insert disassembly from emulator memory and disk images
 * Transfer source code to and from emulators and disk images
-* Diagnostics to identify errors and gotchas
+* Diagnostics, symbol manipulations, macro expansions
 * Options : see `Ctrl+Comma` -> `Extensions` -> `Merlin 6502`
 * Commands: see `Ctrl+P` -> `merlin6502`
 * Activates for file extensions `.asm`, `.S`
@@ -28,6 +26,7 @@ There are a few syntax rules that are *always* enforced by the extension, and wh
 * All delimited strings ("dstrings") must be terminated
 * The characters `;[{}<>=` cannot be used in any label
 * The character `]` cannot be used in any label, except to start a variable
+* Immediate mode in an equivalence is not accepted
 
 ## About Columns and Case
 
@@ -61,10 +60,10 @@ The extension will verify that `EXT` and `EXD` labels are declared as `ENT` in a
 
 ## PUT and USE files
 
-The extension will fully analyze `PUT` and `USE` includes, assuming it can find the referenced files.  The way the file search works is as follows.  The referenced file in column 3 is assumed to be a ProDOS pathname. The filename is extracted, and a search in the project workspace is carried out for a `.S` file with the same name.  The first match is analyzed.  The following should be noted:
+The extension will fully analyze `PUT` and `USE` includes, assuming it can find the referenced files.  The way the file search works is as follows.  The referenced file in column 3 is assumed to be a ProDOS pathname. Matching filenames are gathered, and the best match to the rest of the path is selected.  The following should be noted:
 
-* The ProDOS path and the VS Code project path do not need to match in any way
-* If more than one file match is found, the extension will flag it as an error
+* The ProDOS path and workspace path only need to match on the tail end
+* If there is an ambiguity in the matches, an error is flagged, and the file is not analyzed
 * The file extension should *not* be included in the pseudo-op argument
 
 When editing an include, the master file that defines the context is shown in the lower toolbar.  Clicking on the indicator allows the user to select a different context if applicable, i.e., if the include appears in more than one file.
@@ -124,7 +123,7 @@ This capability only applies to MacOS. Note that [Virtual \]\[](https://virtuali
 
 ## Using with Disk Images
 
-You can access files on a disk image.  In order to do this you must install `a2kit`.  If you have `cargo`, use the terminal to run `cargo install a2kit`, otherwise you can [download an executable](https://github.com/dfgordon/a2kit/releases), taking care to put it in your terminal's path.  As of this writing, the supported image types are `woz`, `dsk`, `do`, `po`, `d13`, `nib`, and `2mg`, assuming the latest `a2kit` is installed.
+You can access files on a disk image.  As of this writing, the supported image types are `woz`, `dsk`, `do`, `po`, `d13`, `nib`, and `2mg`.
 
 * `merlin6502: Insert from disk image`: brings up a file selector allowing you to choose an image file.  Once done, use the mini-menu to traverse the image's directory tree (if applicable) and select either a `TXT` or `BIN` file.  If a `TXT` file is selected it will be decoded as Merlin source and inserted. If a `BIN` file is selected, respond to the disassembly prompts, after which the disassembly is inserted.
 
@@ -141,11 +140,9 @@ Another way to access disk images directly from VS Code is using the `Disk Image
     - to mitigate diagnostic delay, break large source files into smaller modules, or adjust live diagnostics setting
     - if symbol information doesn't load try forcing a diagnostic update
 * Disk Images
-    - update a2kit from time to time
     - Do not write to disk images while they are mounted in an emulator
 * Disassembly
-    - verify that the starting address is aligned with an instruction opcode
-    - stop disassembly before start of data
+    - manually convert code to data using `merlin6502: To data`
     - adjust handling of BRK instruction in settings
 * Merlin
     - restore the configuration defaults, especially memory banks

@@ -19,7 +19,7 @@ async function diagnosticTester(progName: string, expectedMessages: RegExp[]) {
 			if (pair[0].toString() == doc.uri.toString())
 				diagList = pair[1];
 		}
-		await new Promise(resolve => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 200));
 		tries += 1;
 	}
 	if (diagList) {
@@ -100,13 +100,28 @@ describe('Diagnostics: Macros', function () {
 		]);
 	});
 	it('macro variables', async function () {
-		await diagnosticTester('test-mac-vars.S', [
-			/macro substitution variable cannot label a line/,
-			/macro substitution variable cannot label a line/,
-			/macro substitution variable referenced outside macro/,
-			/macro substitution variable referenced outside macro/,
-			/macro substitution variable referenced outside macro/
-		]);
+		const v = vscode.workspace.getConfiguration('merlin6502')?.get('version');
+		if (v && v == 'Merlin 8') {
+			await diagnosticTester('test-mac-vars.S', [
+				/macro substitution variable cannot label a line/,
+				/macro substitution variable cannot label a line/,
+				/macro substitution variable referenced outside macro/,
+				/macro substitution variable referenced outside macro/,
+				/macro substitution variable referenced outside macro/
+			]);
+		} else if (v) {
+			await diagnosticTester('test-mac-vars.S', [
+				/macro substitution variable cannot label a line/,
+				/macro substitution variable cannot label a line/,
+				/argument count cannot label a line/,
+				/macro substitution variable referenced outside macro/,
+				/macro substitution variable referenced outside macro/,
+				/argument count referenced outside macro/,
+				/macro substitution variable referenced outside macro/
+			]);
+		} else {
+			assert.fail('could not get configuration');
+		}
 	});
 	it('macro args', async function () {
 		await diagnosticTester('test-mac-args.S', [
@@ -128,6 +143,7 @@ describe('Diagnostics: declarations', function () {
 	});
 	it('forward variable', async function () {
 		await diagnosticTester('test-decs-fwd-var.S', [
+			/macro substitution variable cannot label a line/,
 			/variable is forward referenced/
 		]);
 	});

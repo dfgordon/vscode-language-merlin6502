@@ -1,24 +1,84 @@
 import * as vscode from 'vscode';
+import * as tok from './semanticTokens';
+import * as lxbase from './langExtBase';
 import * as com from './commands';
+import * as dasm from './disassembly';
 import * as dimg from './diskImage';
 import * as vsclnt from 'vscode-languageclient/node';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 
 export let client: vsclnt.LanguageClient;
 
-/// This function runs when the extension loads.
-/// It creates the parser object, sets up the providers, and sets up event callbacks.
+/** convert arch-platform to rust convention */
+function targetTriple(): string[] {
+	const ans = [];
+	
+	// CPU part
+	if (os.arch() == "arm64") {
+		ans.push("aarch64");
+	} else if (os.arch() == "x64") {
+		ans.push("x86_64");
+	} else {
+		ans.push("unknown");
+	}
+
+	// Vendor part
+	if (os.platform() == "darwin") {
+		ans.push("apple");
+	} else if (os.platform() == "linux") {
+		ans.push("unknown");
+	} else if (os.platform() == "win32") {
+		ans.push("pc");
+	} else {
+		ans.push("unknown");
+	}
+
+	// OS-ABI part
+	if (os.platform() == "darwin") {
+		ans.push("darwin");
+	} else if (os.platform() == "linux") {
+		ans.push("linux-musl");
+	} else if (os.platform() == "win32") {
+		ans.push("windows-msvc.exe");
+	} else {
+		ans.push("unknown");
+	}
+
+	return ans;
+}
+
+function getExecutableNames(context: vscode.ExtensionContext): string[] {
+	const ans = [];
+	const [cpu, vendor, opSys] = targetTriple();
+	const bundled = "server-merlin" + "-" + cpu + "-" + vendor + "-" + opSys;
+	ans.push(context.asAbsolutePath(path.join('server', bundled)));
+	const external = "server-merlin" + (opSys.endsWith(".exe") ? ".exe" : "");
+	ans.push(path.join(os.homedir(),".cargo","bin",external));
+	return ans;
+}
+
+/** this runs after the extension loads */
 export function activate(context: vscode.ExtensionContext)
 {
-	const serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
-	const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
-	const serverOptions: vsclnt.ServerOptions = {
-		run: { module: serverModule, transport: vsclnt.TransportKind.ipc },
-		debug: {
-			module: serverModule,
-			transport: vsclnt.TransportKind.ipc,
-			options: debugOptions
+	const serverCommandOptions = getExecutableNames(context);
+	let serverCommand: string | undefined = undefined;
+	for (const cmd of serverCommandOptions) {
+		if (fs.existsSync(cmd)) {
+			serverCommand = cmd;
+			break;
 		}
+	}
+	if (!serverCommand) {
+		vscode.window.showErrorMessage("Neither a bundled nor an installed server could be found for this platform.  You may be able to solve this with `cargo install a2kit`.");
+		return;
+	}
+	
+	const serverOptions: vsclnt.ServerOptions = {
+		command: serverCommand,
+		args: ["--log-level","off"],
+		transport: vsclnt.TransportKind.stdio
 	};
 	const clientOptions: vsclnt.LanguageClientOptions = {
 		documentSelector: [{ scheme: 'file', language: 'merlin6502' }],
@@ -29,6 +89,8 @@ export function activate(context: vscode.ExtensionContext)
 
 	client = new vsclnt.LanguageClient('merlin6502', 'Merlin 6502', serverOptions, clientOptions);
 	client.start();
+	client.outputChannel.appendLine("using server " + serverCommand);
+	let checkedServerVersion = false;
 
 	const versionIndicator = vscode.window.createStatusBarItem();
 	const typeIndicator = vscode.window.createStatusBarItem();
@@ -37,7 +99,7 @@ export function activate(context: vscode.ExtensionContext)
 	versionIndicator.text = vscode.workspace.getConfiguration('merlin6502').get('version') as string;
 	versionIndicator.tooltip = "Merlin version being targeted (see settings)";
 	typeIndicator.text = "pending";
-	typeIndicator.tooltip = "How the file is interpreted, as source or linker commands";
+	typeIndicator.tooltip = "Relationship to other files";
 	contextIndicator.text = "pending";
 	contextIndicator.tooltip = "File defining context of analysis";
 	contextIndicator.command = "merlin6502.selectMaster";
@@ -45,9 +107,11 @@ export function activate(context: vscode.ExtensionContext)
 	rescanButton.tooltip = "rescan modules and includes";
 	rescanButton.command = "merlin6502.rescan";
 
-	const disassembler = new com.DisassemblyTool();
-	const formatter = new com.FormattingTool();
-	const a2kit = new dimg.A2KitTool();
+	const highlighter = new tok.SemanticTokensProvider();
+	highlighter.register();
+
+	const emulator = new com.EmulatorTool(context);
+	const a2kit = new dimg.A2KitTool(context);
 	const masterSelect = new com.MasterSelect(contextIndicator);
 	const rescanner = new com.RescanTool(rescanButton);
 
@@ -59,10 +123,10 @@ export function activate(context: vscode.ExtensionContext)
 		rescanButton.show();
 	}
 
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",disassembler.getFrontVirtualII,disassembler));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",disassembler.getAppleWinSaveState,disassembler));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",formatter.showPasteableProgram,formatter));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.columns", formatter.resizeColumns, formatter));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",emulator.getFrontVirtualII,emulator));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",emulator.getAppleWinSaveState,emulator));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",com.showPasteableProgram));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.toData", dasm.toData));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFromDiskImage", a2kit.getFromImage, a2kit));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.saveToDiskImage", a2kit.putToImage, a2kit));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.selectMaster", masterSelect.selectMaster, masterSelect));
@@ -76,10 +140,16 @@ export function activate(context: vscode.ExtensionContext)
 			typeIndicator.show();
 			contextIndicator.show();
 			rescanButton.show();
-			client.sendRequest(vsclnt.ExecuteCommandRequest.type, {
-				command: 'merlin6502.activeEditorChanged',
-				arguments: [editor.document.uri.toString()]
-			});
+			if (vscode.workspace.workspaceFolders) {
+				try {
+					lxbase.request<null>("merlin6502.activeEditorChanged", [
+						editor.document.uri.toString()
+					]);
+				} catch (error) {
+					if (error instanceof Error)
+						vscode.window.showErrorMessage(error.message);
+				}
+			}
 		} else {
 			versionIndicator.hide();
 			typeIndicator.hide();
@@ -98,6 +168,14 @@ export function activate(context: vscode.ExtensionContext)
 		typeIndicator.text = params;
 	});
 	client.onNotification<string>(new vsclnt.NotificationType<string>('merlin6502.context'), params => {
+		if (!checkedServerVersion && client.initializeResult?.serverInfo?.version) {
+			const vstr = client.initializeResult.serverInfo.version;
+			const v= vstr.split('.')
+			if (parseInt(v[0]) != 3) {
+				vscode.window.showErrorMessage('Server version is ' + vstr + ', expected 3.x');
+			}
+			checkedServerVersion = true;
+		}
 		contextIndicator.text = params;
 	});
 }

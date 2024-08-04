@@ -1,70 +1,53 @@
 import * as vscode from 'vscode';
-import * as vsclnt from 'vscode-languageclient';
 import * as lxbase from './langExtBase';
 import * as fs from 'fs';
 import * as YAML from 'yaml';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import { platform } from 'os';
-import { client } from './extension';
+import * as srcEncoding from './sourceEncoding';
+import { DisassemblyTool, DasmParams, DasmRange } from './disassembly';
 
-type DisassemblyParams = {
-	getWhat: string,
-	imgOffset: number,
-	addrRange: [number, number],
-	xc: number,
-	label: string
+async function insertWhat() : Promise<string | undefined>
+{
+	return await vscode.window.showQuickPick(['Merlin Source', 'Disassembly: Ranged', 'Disassembly: Last DOS 3.3 BLOAD', 'Disassembly: Last ProDOS BLOAD'], { title: 'Insert what?' });
 }
 
-async function proceedDespiteErrors(document: vscode.TextDocument,actionDesc: string,rng: vscode.Range | undefined) : Promise<boolean>
-{
-	const collection = vscode.languages.getDiagnostics(document.uri);
-	let err = false;
-	collection.forEach(d => {
-		if (d.severity==vscode.DiagnosticSeverity.Error)
-			if (!rng || (rng && d.range.start.line >= rng.start.line && d.range.end.line <= rng.end.line ))
-				err = true;
-	});
-	if (err)
-	{
-		const result = await vscode.window.showWarningMessage(
-			actionDesc + ' with errors is not recommended.  Proceed anyway?',
-			'Proceed','Cancel');
-		if (result!='Proceed')
-			return false;
+function dasm_range_type(s: string): DasmRange {
+	if (s.includes("Ranged")) {
+		return DasmRange.Range;
+	} else if (s.includes("3.3")) {
+		return DasmRange.LastBloadDos33;
+	} else if (s.includes("ProDOS")) {
+		return DasmRange.LastBloadProdos;
+	} else {
+		return DasmRange.All;
 	}
-	return true;
 }
 
-export class FormattingTool
+export async function showPasteableProgram(): Promise<string|undefined>
 {
-	async showPasteableProgram(): Promise<string|undefined>
-	{
-		let verified = lxbase.verify_document();
-		if (!verified)
-			return;
-		const proceed = await proceedDespiteErrors(verified.doc,'Formatting',undefined);
-		if (!proceed)
-			return;
-		verified = lxbase.verify_document();
-		if (!verified)
-			return;
-		const formattedCode = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
-			{
-				command: 'merlin6502.pasteFormat',
-				arguments: [
-					verified.doc.getText().split(/\r?\n/),
-					verified.doc.uri.toString()
-				]
-			});
-		vscode.workspace.openTextDocument({content: formattedCode, language: 'merlin6502'}).then(doc => {
+	let verified = lxbase.verify_document();
+	if (!verified)
+		return;
+	const proceed = await lxbase.proceedDespiteErrors(verified.doc,'Formatting',undefined);
+	if (!proceed)
+		return;
+	verified = lxbase.verify_document();
+	if (!verified)
+		return;
+	try {
+		const formattedCode = await lxbase.request<string>('merlin6502.pasteFormat', [
+			verified.doc.getText(),
+			verified.doc.uri.toString()
+		]);
+		vscode.workspace.openTextDocument({ content: formattedCode, language: 'merlin6502' }).then(doc => {
 			vscode.window.showTextDocument(doc);
 		});
 		return formattedCode;
-	}
-	async resizeColumns()
-	{
-		vscode.window.showInformationMessage('Command is retired, please use native VS Code formatting commands');
+	} catch (error) {
+		if (error instanceof Error)
+			vscode.window.showErrorMessage(error.message);
 	}
 }
 
@@ -79,28 +62,26 @@ export class MasterSelect
 		let verified = lxbase.verify_document();
 		if (!verified)
 			return;
-		const save_uri = verified.doc.uri;
-		const master_list = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
-			{
-				command: 'merlin6502.getMasterList',
-				arguments: [verified.doc.uri.toString()]
-			});
-		if (!master_list)
-			return;
-		const sel = await vscode.window.showQuickPick(master_list);
-		if (!sel)
-			return;
-		verified = lxbase.verify_document();
-		if (!verified)
-			return;
-		if (verified.doc.uri != save_uri)
-			return;
-		await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
-			{
-				command: 'merlin6502.selectMaster',
-				arguments: [sel]
-			});
-		this.contextIndicator.text = path.basename(sel,".S");
+		const display_uri = verified.doc.uri;
+		try {
+			const master_list = await lxbase.request<string[]>('merlin6502.getMasterList', [display_uri.toString()]);
+			if (!master_list)
+				return;
+			const sel = await vscode.window.showQuickPick(master_list);
+			if (!sel)
+				return;
+			verified = lxbase.verify_document();
+			if (!verified)
+				return;
+			if (verified.doc.uri != display_uri)
+				return;
+			await lxbase.request<null>('merlin6502.selectMaster', [display_uri.toString(),sel]);
+			//verified.ed.edit(edit => { edit.insert(new vscode.Position(0,0),"")});
+			this.contextIndicator.text = path.basename(sel);
+		} catch (error) {
+			if (error instanceof Error)
+				vscode.window.showErrorMessage(error.message);
+		}
 	}
 }
 
@@ -115,71 +96,18 @@ export class RescanTool
 		const verified = lxbase.verify_document();
 		if (!verified)
 			return;
-		client.sendRequest(vsclnt.ExecuteCommandRequest.type,
-			{
-				command: 'merlin6502.rescan',
-				arguments: [verified.doc.uri.toString()]
-			});
+		try {
+			lxbase.request<null>('merlin6502.rescan', [verified.doc.uri.toString()]);
+			//verified.ed.edit(edit => { edit.insert(new vscode.Position(0,0),"")});
+		} catch (error) {
+			if (error instanceof Error)
+				vscode.window.showErrorMessage(error.message);
+		}
 	}
 }
 
-export class DisassemblyTool
+export class EmulatorTool extends lxbase.LangExtBase
 {
-	async getAddressInput(name: string,min:number,max:number,suggestion:number) : Promise<number | undefined>
-	{
-		const res = await vscode.window.showInputBox({
-			title: 'enter ' + name + ' address',
-			value: suggestion.toString(),
-			validateInput: (value) => {
-				const val = parseInt(value);
-				if (isNaN(val))
-					return "address should be a number"
-				if (val < min || val > max)
-					return "range is " + min + " to " + max;
-				return undefined;
-			}
-		});
-		if (!res)
-			return undefined;
-		return parseInt(res);
-	}
-	async getDisassemblyParameters(getWhat: string, imgOffset: number, minAddr: number, maxAddr: number): Promise<DisassemblyParams | undefined> {
-		let startAddr : number|undefined = 0;
-		let endAddr : number|undefined = 0;
-		let xc = 0;
-		let lbl : string|undefined = 'label every line';
-		// if last BLOAD was requested, leave startAddr=endAddr=0 and server will get the range from the memory image
-		if (getWhat.slice(-6)=='Ranged')
-			startAddr = await this.getAddressInput('starting',minAddr,maxAddr-1,minAddr);
-		if (startAddr==undefined)
-			return;
-		if (getWhat.slice(-6)=='Ranged')
-			endAddr = await this.getAddressInput('ending',startAddr+1,maxAddr,maxAddr);
-		if (endAddr==undefined)
-			return;
-		const res = await vscode.window.showQuickPick(['6502','65C02','65816'],{title:'Processor Target'});
-		if (!res)
-			return;
-		if (res=='65C02')
-			xc = 1;
-		if (res=='65816')
-			xc = 2;
-		lbl = await vscode.window.showQuickPick(['label every line','label some lines','label no lines'],{title:'Label Policy'});
-		if (!lbl)
-			return;
-		return { getWhat: getWhat, imgOffset: imgOffset, addrRange: [startAddr, endAddr], xc: xc, label: lbl };
-	}
-	async getInsertionParameters(max:number) : Promise<DisassemblyParams | undefined>
-	{
-		const getWhat = await vscode.window.showQuickPick(['Merlin Source', 'Disassembly: Ranged', 'Disassembly: Last DOS 3.3 BLOAD', 'Disassembly: Last ProDOS BLOAD'], { title: 'Insert what?' });
-		if (!getWhat)
-			return;
-		if (getWhat.substring(0, 11) == 'Disassembly') {
-			const params = await this.getDisassemblyParameters(getWhat, 0, 0, max);
-			return params;
-		}
-		return { getWhat: getWhat, imgOffset: 0, addrRange: [0, 0], xc: 0, label: '' };
-	}
 	openAppleWinSaveState(uri : vscode.Uri[]|undefined) : [[string,string][],[string,string][]] | undefined
 	{
 		if (!uri)
@@ -209,73 +137,51 @@ export class DisassemblyTool
 		vscode.window.showErrorMessage('Failed to parse YAML');
 		return;
 	}
-	async insertCode(params:DisassemblyParams,img:Buffer,auxZP:Buffer|undefined)
-	{
-		let content = '';
-		if (params.getWhat.substring(0, 11) == 'Disassembly') {
-			const img_messg: number[] = Array.from(Uint8Array.from(img));
-			content = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
-				{
-					command: 'merlin6502.disassemble',
-					arguments: [
-						img_messg,
-						params
-					]
-				});
-		}
-		else {
-			const startAddr = auxZP ? auxZP[10] + 256*auxZP[11] : img[10] + 256*img[11];
-			const endAddr = auxZP ? auxZP[14] + 256 * auxZP[15] : img[14] + 256 * img[15];
-			const img_messg: number[] = Array.from(Uint8Array.from(img));
-			content = await client.sendRequest(vsclnt.ExecuteCommandRequest.type,
-				{
-					command: 'merlin6502.detokenize',
-					arguments: img_messg.slice(startAddr,endAddr)
-				});
-		}
-		const verified = lxbase.verify_document();
-		if (verified && content && content.length>1)
-			verified.ed.edit( edit => { edit.replace(verified.ed.selection,content); });
-		else if (verified)
-			vscode.window.showWarningMessage('insert failed (no code found)');
-		else
-			vscode.window.showWarningMessage('insert failed (problem with document)');
-	}
 	async getAppleWinSaveState()
 	{
-		const params = await this.getInsertionParameters(2**16);
-		if (!params)
+		const getWhat = await insertWhat();
+		if (!getWhat)
 			return;
-		vscode.window.showOpenDialog({
-		"canSelectMany": false,
-		"canSelectFiles":true,
-		"filters": {"Save state": ["yaml"]},
-		"title": "Insert from AppleWin State"
-		}).then(uri => {
-			const res = this.openAppleWinSaveState(uri);
-			if (!res) {
-				// error message already given
-				return;
-			}
-			const [main,aux] = res;
-			const buffList = new Array<Buffer>();
-			let last_addr = -1;
-			for (const [addr, hexRow] of main) {
-				const curr_addr = parseInt(addr, 16);
-				if (curr_addr < last_addr) {
-					vscode.window.showErrorMessage("sanity check failed while parsing save state's main memory");
-					return;
-				}
-				buffList.push(Buffer.from(hexRow, "hex"));
-				last_addr = curr_addr;
-			}
-			const zpRow = aux[0][1];
-			if (!zpRow) {
-				vscode.window.showErrorMessage("could not load auxilliary zero page from save state");
-				return;
-			}
-			this.insertCode(params,Buffer.concat(buffList),Buffer.from(zpRow,"hex"));
+		const uri = await vscode.window.showOpenDialog({
+			"canSelectMany": false,
+			"canSelectFiles": true,
+			"filters": { "Save state": ["yaml"] },
+			"title": "Insert from AppleWin State"
 		});
+		if (!uri) {
+			return;
+		}
+		const res = this.openAppleWinSaveState(uri);
+		if (!res) {
+			// error message already given
+			return;
+		}
+		const [main,aux] = res;
+		const buffList = new Array<Buffer>();
+		let last_addr = -1;
+		for (const [addr, hexRow] of main) {
+			const curr_addr = parseInt(addr, 16);
+			if (curr_addr < last_addr) {
+				vscode.window.showErrorMessage("sanity check failed while parsing save state's main memory");
+				return;
+			}
+			buffList.push(Buffer.from(hexRow, "hex"));
+			last_addr = curr_addr;
+		}
+		const zpRow = aux[0][1];
+		if (!zpRow) {
+			vscode.window.showErrorMessage("could not load auxilliary zero page from save state");
+			return;
+		}
+		if (getWhat == "Merlin Source") {
+			srcEncoding.insert_from_ram_image(Buffer.concat(buffList), Buffer.from(zpRow, "hex"));
+		} else {
+			const dasm = new DisassemblyTool();
+			const params = await dasm.getDisassemblyParameters(dasm_range_type(getWhat), 0, 2 ** 16);
+			if (params) {
+				dasm.insertCode(params, Buffer.concat(buffList));
+			}
+		}
 	}
 	async getFrontVirtualII()
 	{
@@ -284,23 +190,34 @@ export class DisassemblyTool
 			vscode.window.showWarningMessage('This command is only available on macOS');
 			return;
 		}
-		const params = await this.getInsertionParameters(2**15+2**14);
-		if (!params)
+		const getWhat = await insertWhat();
+		if (!getWhat)
 			return;
-		const warnMess = params.getWhat.substring(0,11)!='Disassembly' ? 'Please verify that Merlin is running in the front machine' : 'Please verify the front machine is ready';
+		let dasm: DisassemblyTool;
+		let params: DasmParams | undefined;
+		if (getWhat.includes("Disassembly")) {
+			dasm = new DisassemblyTool();
+			params = await dasm.getDisassemblyParameters(dasm_range_type(getWhat), 0, 2 ** 16);
+		}
+		const warnMess = getWhat.includes('Disassembly') ? 'Please verify that Merlin is running in the front machine' : 'Please verify the front machine is ready';
 		const res = await vscode.window.showWarningMessage(warnMess,'Proceed','Cancel');
 		if (res!='Proceed')
 			return;
-		const scriptPath = path.join(__dirname,'vscode-to-vii.scpt');
-		const dumpPath = path.join(__dirname,'scratch.dump');
+		const scriptPath = path.join(this.binPath,'vscode-to-vii.scpt');
+		const dumpPath = path.join(this.binPath,'scratch.dump');
 		const process = spawn('osascript',[scriptPath,"get",dumpPath]);
 		process.stderr.on('data',data => {
 			vscode.window.showErrorMessage(`${data}`);
 		});
 		process.on('close',(code) => {
-			if (code===0)
-			{
-				this.insertCode(params,fs.readFileSync(dumpPath),undefined);
+			if (code === 0) {
+				if (getWhat == "Merlin Source") {
+					srcEncoding.insert_from_ram_image(fs.readFileSync(dumpPath), undefined);
+				} else {
+					if (params) {
+						dasm.insertCode(params, fs.readFileSync(dumpPath));
+					}
+				}
 			}
 		});
 	}
