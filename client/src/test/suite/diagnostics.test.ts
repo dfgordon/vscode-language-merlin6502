@@ -67,7 +67,9 @@ describe('Diagnostics: Macros', function () {
 	it('matches instruction', async function () {
 		await diagnosticTester('test-matches-instruction.S', [
 			/macro name matches a mnemonic/,
-			/macro name matches a mnemonic/
+			/macro name matches a mnemonic/,
+			/folding range is never closed/,
+			/folding range is never closed/
 		]);
 	});
 	it('undefined macro', async function () {
@@ -105,6 +107,7 @@ describe('Diagnostics: Macros', function () {
 			await diagnosticTester('test-mac-vars.S', [
 				/macro substitution variable cannot label a line/,
 				/macro substitution variable cannot label a line/,
+				/assembly disabled/,
 				/macro substitution variable referenced outside macro/,
 				/macro substitution variable referenced outside macro/,
 				/macro substitution variable referenced outside macro/
@@ -114,6 +117,7 @@ describe('Diagnostics: Macros', function () {
 				/macro substitution variable cannot label a line/,
 				/macro substitution variable cannot label a line/,
 				/argument count cannot label a line/,
+				/assembly disabled/,
 				/macro substitution variable referenced outside macro/,
 				/macro substitution variable referenced outside macro/,
 				/argument count referenced outside macro/,
@@ -209,5 +213,15 @@ describe('Diagnostics: equates', function () {
 			]);
 		else
 			assert.fail('could not get configuration');
+	});
+});
+
+describe('Diagnostics: forward', function () {
+	it('psop_fwd', async function () {
+			await diagnosticTester('test-ill-fwd.S', [
+				/evaluation was deferred/,
+				/illegal forward reference/,
+				/illegal forward reference/
+			]);
 	});
 });

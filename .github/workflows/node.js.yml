@@ -12,12 +12,13 @@ defaults:
     shell: bash
     
 jobs:
-  build:
-
+  test:
+    # Test OS matrix by compiling a2kit from crates.io each time.
+    # Actual deployment will use a bundled a2kit language server.
     strategy:
       matrix:
         node-version: [20.x]
-        OS: [windows-latest]
+        OS: [ubuntu-latest,macos-latest,windows-latest]
 
     runs-on: ${{ matrix.OS }}
 
@@ -29,8 +30,16 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: npm install --include=dev
+    - name: Cargo cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ./target
+        key: test-cargo-registry
+    - name: Install a2kit
+      run: cargo install a2kit
     - run: cd client && npm install --include=dev && cd ..
-    - run: cd server && npm install --include=dev && cd ..
     - run: npm run test-compile
     - run: xvfb-run -a npm test
       if: runner.os == 'Linux'

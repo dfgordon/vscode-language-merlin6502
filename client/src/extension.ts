@@ -66,6 +66,11 @@ export function activate(context: vscode.ExtensionContext)
 	let serverCommand: string | undefined = undefined;
 	for (const cmd of serverCommandOptions) {
 		if (fs.existsSync(cmd)) {
+			try {
+				fs.accessSync(cmd, fs.constants.X_OK);
+			} catch (err) {
+				fs.chmodSync(cmd, fs.constants.S_IXUSR | fs.constants.S_IRUSR | fs.constants.S_IXGRP | fs.constants.S_IXOTH);
+			}
 			serverCommand = cmd;
 			break;
 		}
@@ -88,9 +93,19 @@ export function activate(context: vscode.ExtensionContext)
 	};
 
 	client = new vsclnt.LanguageClient('merlin6502', 'Merlin 6502', serverOptions, clientOptions);
-	client.start();
+	client.start().then(() => {
+		if (client.initializeResult?.serverInfo?.version) {
+			const vstr = client.initializeResult.serverInfo.version;
+			const v= vstr.split('.')
+			if (parseInt(v[0]) != 3) {
+				vscode.window.showErrorMessage('Server version is ' + vstr + ', expected 3.x, stopping.');
+				client.stop();
+			}
+		} else {
+			vscode.window.showErrorMessage('unable to check server version, continuing anyway...');
+		}
+	});
 	client.outputChannel.appendLine("using server " + serverCommand);
-	let checkedServerVersion = false;
 
 	const versionIndicator = vscode.window.createStatusBarItem();
 	const typeIndicator = vscode.window.createStatusBarItem();
@@ -107,8 +122,8 @@ export function activate(context: vscode.ExtensionContext)
 	rescanButton.tooltip = "rescan modules and includes";
 	rescanButton.command = "merlin6502.rescan";
 
-	const highlighter = new tok.SemanticTokensProvider();
-	highlighter.register();
+	// const highlighter = new tok.SemanticTokensProvider();
+	// highlighter.register();
 
 	const emulator = new com.EmulatorTool(context);
 	const a2kit = new dimg.A2KitTool(context);
@@ -168,14 +183,6 @@ export function activate(context: vscode.ExtensionContext)
 		typeIndicator.text = params;
 	});
 	client.onNotification<string>(new vsclnt.NotificationType<string>('merlin6502.context'), params => {
-		if (!checkedServerVersion && client.initializeResult?.serverInfo?.version) {
-			const vstr = client.initializeResult.serverInfo.version;
-			const v= vstr.split('.')
-			if (parseInt(v[0]) != 3) {
-				vscode.window.showErrorMessage('Server version is ' + vstr + ', expected 3.x');
-			}
-			checkedServerVersion = true;
-		}
 		contextIndicator.text = params;
 	});
 }

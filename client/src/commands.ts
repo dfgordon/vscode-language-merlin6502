@@ -76,7 +76,6 @@ export class MasterSelect
 			if (verified.doc.uri != display_uri)
 				return;
 			await lxbase.request<null>('merlin6502.selectMaster', [display_uri.toString(),sel]);
-			//verified.ed.edit(edit => { edit.insert(new vscode.Position(0,0),"")});
 			this.contextIndicator.text = path.basename(sel);
 		} catch (error) {
 			if (error instanceof Error)
@@ -98,7 +97,6 @@ export class RescanTool
 			return;
 		try {
 			lxbase.request<null>('merlin6502.rescan', [verified.doc.uri.toString()]);
-			//verified.ed.edit(edit => { edit.insert(new vscode.Position(0,0),"")});
 		} catch (error) {
 			if (error instanceof Error)
 				vscode.window.showErrorMessage(error.message);
@@ -204,7 +202,7 @@ export class EmulatorTool extends lxbase.LangExtBase
 		if (res!='Proceed')
 			return;
 		const scriptPath = path.join(this.binPath,'vscode-to-vii.scpt');
-		const dumpPath = path.join(this.binPath,'scratch.dump');
+		const dumpPath = path.join(this.outPath,'scratch.dump');
 		const process = spawn('osascript',[scriptPath,"get",dumpPath]);
 		process.stderr.on('data',data => {
 			vscode.window.showErrorMessage(`${data}`);

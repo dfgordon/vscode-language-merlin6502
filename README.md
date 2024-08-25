@@ -5,17 +5,20 @@
 Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of processors in Visual Studio Code, with extras for Apple II.
 
 * Conforms to choice of Merlin version and processor target
+* Diagnostics, symbol manipulations, macro expansions
 * Resolves labels across project workspace
 * Comprehensive highlights, completions, and hovers
-* Completions and hovers for Apple II soft switches, ROM routines, etc.
-* Insert disassembly from emulator memory and disk images
-* Transfer source code to and from emulators and disk images
-* Diagnostics, symbol manipulations, macro expansions
+* Interact with emulators and disk images, see below
 * Options : see `Ctrl+Comma` -> `Extensions` -> `Merlin 6502`
 * Commands: see `Ctrl+P` -> `merlin6502`
 * Activates for file extensions `.asm`, `.S`
 
 <img src="sample/demo-merlin.gif" alt="session capture"/>
+
+
+## Language Server
+
+The language server is usually bundled with the extension.  If your platform isn't supported directly, you may still be able to use the extension by running `cargo install a2kit` from the terminal.
 
 ## Merlin Syntax Settings
 
@@ -25,6 +28,7 @@ There are a few syntax rules that are *always* enforced by the extension, and wh
 
 * All delimited strings ("dstrings") must be terminated
 * The characters `;[{}<>=` cannot be used in any label
+* The characters `|^` cannot start a label
 * The character `]` cannot be used in any label, except to start a variable
 * Immediate mode in an equivalence is not accepted
 
@@ -134,15 +138,15 @@ Another way to access disk images directly from VS Code is using the `Disk Image
 ## Troubleshooting Tips
 
 * VS Code
-    - the language server has trouble with untitled documents; when creating a new document save it early
+    - the language server will not analyze untitled documents; when creating a new document save it early
     - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
     - tab your way to the end of snippets
     - to mitigate diagnostic delay, break large source files into smaller modules, or adjust live diagnostics setting
-    - if symbol information doesn't load try forcing a diagnostic update
 * Disk Images
     - Do not write to disk images while they are mounted in an emulator
 * Disassembly
-    - manually convert code to data using `merlin6502: To data`
+    - convert code to data using `merlin6502: To data`
+    - insert ORG at the start of possible data sections to help spot-assembler resolve PC
     - adjust handling of BRK instruction in settings
 * Merlin
     - restore the configuration defaults, especially memory banks

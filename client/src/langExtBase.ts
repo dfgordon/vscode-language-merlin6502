@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as vsclnt from 'vscode-languageclient';
 import { client } from './extension';
+import * as path from 'path';
 
 type ArgType = null | undefined | boolean | string | string[] | number | number[] |
 	vsclnt.Range | vsclnt.TextDocumentItem | vscode.Uri[];
@@ -18,10 +19,12 @@ export function verify_document() : {ed:vscode.TextEditor,doc:vscode.TextDocumen
 export class LangExtBase {
 	config: vscode.WorkspaceConfiguration;
 	binPath: string;
+	outPath: string;
 	constructor(ctx: vscode.ExtensionContext)
 	{
 		this.config = vscode.workspace.getConfiguration('merlin6502');
 		this.binPath = ctx.asAbsolutePath('server');
+		this.outPath = ctx.asAbsolutePath(path.join('client','out'));
 	}
 }
 	
