@@ -145,7 +145,7 @@ Another way to access disk images directly from VS Code is using the `Disk Image
 * Disk Images
     - Do not write to disk images while they are mounted in an emulator
 * Disassembly
-    - convert code to data using `merlin6502: To data`
+    - convert code to data using `merlin6502: Convert code lines to data lines`
     - insert ORG at the start of possible data sections to help spot-assembler resolve PC
     - adjust handling of BRK instruction in settings
 * Merlin
