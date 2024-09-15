@@ -198,18 +198,14 @@ describe('Diagnostics: equates', function () {
 		const v = vscode.workspace.getConfiguration('merlin6502')?.get('version');
 		if (v && v == 'Merlin 8')
 			await diagnosticTester('test-ent-equates.S', [
-				/global label is undefined/,
-				/global label is undefined/,
-				/global label is undefined/,
+				/entry label declared, but never defined/,
 				/pseudo-op argument is disabled/,
 				/pseudo-op argument is disabled/,
 				/pseudo-op argument is disabled/,
 			]);
 		else if (v)
 			await diagnosticTester('test-ent-equates.S', [
-				/global label is undefined/,
-				/global label is undefined/,
-				/global label is undefined/
+				/entry label declared, but never defined/
 			]);
 		else
 			assert.fail('could not get configuration');

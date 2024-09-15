@@ -94,7 +94,7 @@ export class A2KitTool extends lxbase.LangExtBase {
 			this.operation = "get";
 			this.imgPath = [""];
 			
-			let response: string[] | number[] | string = await lxbase.request<Array<string>>("merlin6502.disk.pick", [this.currPath(),["txt","bin","sys"]]);
+			let response: string[] | number[] = await lxbase.request<Array<string>>("merlin6502.disk.pick", [this.currPath(),["txt","bin","sys"]]);
 			if (response.length==0) {
 				vscode.window.showErrorMessage('no sources, binaries, or directories were found');
 				return;

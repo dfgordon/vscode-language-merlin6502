@@ -46,7 +46,7 @@ Merlin labels are case sensitive, while instruction and pseudo-instruction mnemo
 
 ## Working with Labels
 
-You can use `Go to Declaration`, `Go to Definition`, `Go to References`, and `Rename Symbol` to find and manipulate labels.  You can also jump to labels using `Ctrl+O` (symbol in document), or `Ctrl+t` (entry labels throughout workspace).  Renaming is scoped to a document and its `PUT` and `USE` includes.
+You can use `Go to Declaration`, `Go to Definition`, `Go to References`, and `Rename Symbol` to find and manipulate labels.  You can also jump to labels using `Ctrl+O` (symbol in document), or `Ctrl+t` (entry labels throughout workspace).  Renaming is scoped to a document, its `PUT` and `USE` includes, and its primary entry labels.
 
 Headings (`*` comments) placed on lines immediately before a label definition are considered docstrings and become part of the hover for that label.  Markdown can be used in the docstrings.
 

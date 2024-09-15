@@ -5,9 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2024-09-15
+
+### New Features
+
+* Hovering on an EXT label shows the ENT label's docstring
+* `Go to...` commands behave more correctly
+    - Using `Go to declarations` on a reference to an EXT goes to the EXT
+    - Using `Go to definitions` on a reference to an EXT goes to the ENT
+    - Using `Go to...` from any node is valid, e.g., if we start on a definition and ask for definitions the references are returned.  This is the usual VS Code behavior.
+* `Rename Symbol` finds primary workspace symbols
+* Additional workspace checks
+
 ## [3.0.1] - 2024-09-08
 
-## Fixes
+### Fixes
 
 * Searching for workspace symbols (ENT labels)
 * Correct a bug in rename symbol (still scoped to doc + includes, however)
