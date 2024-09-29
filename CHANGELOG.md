@@ -5,9 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.2] - 2024-09-29
+
+### Fixes
+
+* Repair lower case completions logic, takes effect if:
+  - `completions.lowerCase==true && flag.caseSensitive=="ignore"`
+
 ## [3.1.1] - 2024-09-15
 
 Replace bundled darwin-arm64 server with the correct version.
+
+This patch will be skipped over by all other platforms.
 
 ## [3.1.0] - 2024-09-15
 

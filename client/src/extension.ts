@@ -82,6 +82,7 @@ export function activate(context: vscode.ExtensionContext)
 	
 	const serverOptions: vsclnt.ServerOptions = {
 		command: serverCommand,
+		//args: ["--log-level","off","--suppress-tokens"],
 		args: ["--log-level","off"],
 		transport: vsclnt.TransportKind.stdio
 	};
