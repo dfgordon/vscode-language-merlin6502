@@ -3,7 +3,7 @@
 	"displayName": "Merlin 6502",
 	"description": "Merlin assembly language for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
-	"version": "3.1.2",
+	"version": "3.2.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -161,6 +161,10 @@
 			{
 				"command": "merlin6502.toData",
 				"title": "merlin6502: Convert code lines to data lines"
+			},
+			{
+				"command": "merlin6502.toCode",
+				"title": "merlin6502: Convert data lines to code lines"
 			}
 		],
 		"menus": {
@@ -195,7 +199,11 @@
 				},
 				{
 					"command": "merlin6502.toData",
-					"title": "editorLangId == merlin6502"
+					"when": "editorLangId == merlin6502"
+				},
+				{
+					"command": "merlin6502.toCode",
+					"when": "editorLangId == merlin6502"
 				}
 			]
 		}

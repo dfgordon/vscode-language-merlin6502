@@ -197,7 +197,7 @@ export class EmulatorTool extends lxbase.LangExtBase
 			dasm = new DisassemblyTool();
 			params = await dasm.getDisassemblyParameters(dasm_range_type(getWhat), 0, 2 ** 16);
 		}
-		const warnMess = getWhat.includes('Disassembly') ? 'Please verify that Merlin is running in the front machine' : 'Please verify the front machine is ready';
+		const warnMess = getWhat.includes('Disassembly') ? 'Please verify the front machine is ready' : 'Please verify that Merlin is running in the front machine';
 		const res = await vscode.window.showWarningMessage(warnMess,'Proceed','Cancel');
 		if (res!='Proceed')
 			return;

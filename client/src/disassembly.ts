@@ -133,7 +133,7 @@ export class DisassemblyTool
 	}
 }
 
-export async function toData() {
+async function convert(cmd: string) {
 	let verified = lxbase.verify_document();
 	if (!verified)
 		return;
@@ -145,7 +145,7 @@ export async function toData() {
 		return;
 	const [beg, end] = lxbase.selectionToLineRange(verified.ed.selection);
 	try {
-		const content = await lxbase.request<string>('merlin6502.toData', [
+		const content = await lxbase.request<string>(cmd, [
 			verified.doc.getText(),
 			verified.doc.uri.toString(),
 			beg,
@@ -164,4 +164,12 @@ export async function toData() {
 		if (error instanceof Error)
 			vscode.window.showErrorMessage(error.message);
 	}
+}
+
+export async function toData() {
+	convert('merlin6502.toData');
+}
+
+export async function toCode() {
+	convert('merlin6502.toCode');
 }

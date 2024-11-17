@@ -97,6 +97,7 @@ export function activate(context: vscode.ExtensionContext)
 	client.start().then(() => {
 		if (client.initializeResult?.serverInfo?.version) {
 			const vstr = client.initializeResult.serverInfo.version;
+			client.outputChannel.appendLine("Server version is " + vstr);
 			const v= vstr.split('.')
 			if (parseInt(v[0]) != 3) {
 				vscode.window.showErrorMessage('Server version is ' + vstr + ', expected 3.x, stopping.');
@@ -143,6 +144,7 @@ export function activate(context: vscode.ExtensionContext)
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",emulator.getAppleWinSaveState,emulator));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",com.showPasteableProgram));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.toData", dasm.toData));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.toCode", dasm.toCode));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFromDiskImage", a2kit.getFromImage, a2kit));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.saveToDiskImage", a2kit.putToImage, a2kit));
 	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.selectMaster", masterSelect.selectMaster, masterSelect));

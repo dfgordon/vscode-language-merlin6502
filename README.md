@@ -8,10 +8,10 @@ Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of
 * Diagnostics, symbol manipulations, macro expansions
 * Resolves labels across project workspace
 * Comprehensive highlights, completions, and hovers
-* Interact with emulators and disk images, see below
-* Options : see `Ctrl+Comma` -> `Extensions` -> `Merlin 6502`
-* Commands: see `Ctrl+P` -> `merlin6502`
-* Activates for file extensions `.asm`, `.S`
+* Interact with [emulators](#using-with-applewin) and [disk images](#using-with-disk-images)
+* Perform [disassembly](#disassembly) within the editor
+
+Activates for file extensions `.asm`, `.S`
 
 <img src="sample/demo-merlin.gif" alt="session capture"/>
 
@@ -135,19 +135,32 @@ You can access files on a disk image.  As of this writing, the supported image t
 
 Another way to access disk images directly from VS Code is using the `Disk Image Notebook` extension.
 
-## Troubleshooting Tips
+## Disassembly
+
+You can work through a disassembly process entirely within the editor.
+
+* Perform initial disassembly by accessing a disk image or emulator (see above)
+    - Disassemble with "label all lines" and save it as a fixed reference
+    - Disassemble with "label some lines" and use it as a basis for modification
+* If there is a suspected data section, use `merlin6502: Convert code lines to data lines`
+* If data was interpreted too aggressively, revert using `merlin6502: Convert data lines to code lines`
+* The conversions make use of a "spot-assembler" that sometimes needs a program-counter hint
+    - In the lines to be converted, insert `ORG` or a *literal label*
+    - Labels of the form `_XXXX`, where `X` is a hex digit, are interpreted as *literal labels*
+* You can insert `MX` at the beginning of a possible code section before converting
+* You can adjust how `BRK` is handled in settings
+
+As the disassembly progresses, gradually give the literal labels more meaningful names, and change them to local labels if appropriate.
+
+## Tips
 
 * VS Code
     - the language server will not analyze untitled documents; when creating a new document save it early
     - when entering hexadecimal into *editor* commands, use the modern convention, e.g. use `0xff` rather than `$ff`.
     - tab your way to the end of snippets
-    - to mitigate diagnostic delay, break large source files into smaller modules, or adjust live diagnostics setting
+    - For very large projects you may want to adjust live diagnostics setting
 * Disk Images
     - Do not write to disk images while they are mounted in an emulator
-* Disassembly
-    - convert code to data using `merlin6502: Convert code lines to data lines`
-    - insert ORG at the start of possible data sections to help spot-assembler resolve PC
-    - adjust handling of BRK instruction in settings
 * Merlin
     - restore the configuration defaults, especially memory banks
     - use the 128K version of Merlin 8

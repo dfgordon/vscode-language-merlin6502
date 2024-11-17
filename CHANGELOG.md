@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2024-11-17
+
+### Fixes
+
+* Fix some issues in disassembly workflows
+
+### New Features
+
+* Disassembly: data sections can be converted back to code
+* Guard against excessive workspace scans
+    - maximum directory count and recursion depth
+    - passes over `build`, `node_modules`, and `target` directories
+
 ## [3.1.2] - 2024-09-29
 
 ### Fixes
