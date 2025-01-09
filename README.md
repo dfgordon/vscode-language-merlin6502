@@ -8,7 +8,7 @@ Language support for Merlin 8/16/16+/32 assembly language for the 6502 family of
 * Diagnostics, symbol manipulations, macro expansions
 * Resolves labels across project workspace
 * Comprehensive highlights, completions, and hovers
-* Interact with [emulators](#using-with-applewin) and [disk images](#using-with-disk-images)
+* Interact with [emulators](#using-with-emulators) and [disk images](#using-with-disk-images)
 * Perform [disassembly](#disassembly) within the editor
 
 Activates for file extensions `.asm`, `.S`
@@ -87,7 +87,9 @@ In the spirit of the original Merlin, we rely on the `XC` pseudo-operation to en
 
 However, note that `XC OFF` was not introduced until Merlin 16+.  The Merlin 32 assembler appears to ignore `XC`, but you can still use it in the extension for diagnostic purposes.
 
-## Using with AppleWin
+## Using with Emulators
+
+### AppleWin
 
 You can transfer code to and from the [AppleWin](https://github.com/AppleWin/AppleWin) emulator.
 
@@ -107,7 +109,7 @@ You can transfer code to and from the [AppleWin](https://github.com/AppleWin/App
 
 Operations with the state file are the same on any platform, but [AppleWin](https://github.com/AppleWin/AppleWin) itself is native to Windows.  Note that [AppleWin](https://github.com/AppleWin/AppleWin) is not part of the extension, and must be installed separately.
 
-## Using with Virtual ][
+### Virtual ][
 
 You can transfer code to and from the [Virtual \]\[](https://virtualii.com) emulator.
 
@@ -149,6 +151,7 @@ You can work through a disassembly process entirely within the editor.
     - Labels of the form `_XXXX`, where `X` is a hex digit, are interpreted as *literal labels*
 * You can insert `MX` at the beginning of a possible code section before converting
 * You can adjust how `BRK` is handled in settings
+* As of this writing, explicit 24-bit `ORG` values should be avoided
 
 As the disassembly progresses, gradually give the literal labels more meaningful names, and change them to local labels if appropriate.
 

@@ -15,7 +15,7 @@ if ($changelog.ToLower() -match "unreleased") {
 	exit 1
 }
 
-if (! ($changelog -match (Get-Date -Format yyyy-M-d))) {
+if (! ($changelog -match (Get-Date -Format yyyy-MM-dd))) {
 	Write-Error "today's date is not in the CHANGELOG"
 	exit 1
 }
