@@ -69,7 +69,9 @@ describe('Diagnostics: Macros', function () {
 			/macro name matches a mnemonic/,
 			/macro name matches a mnemonic/,
 			/folding range is never closed/,
-			/folding range is never closed/
+			/folding range is never closed/,
+			/macro is never referenced in current context/,
+			/macro is never referenced in current context/,
 		]);
 	});
 	it('undefined macro', async function () {
@@ -86,16 +88,19 @@ describe('Diagnostics: Macros', function () {
 	});
 	it('macro context', async function () {
 		await diagnosticTester('test-mac-context.S', [
+			/macro is never referenced in current context/,
 			/macro cannot be used here/
 		]);
 	});
 	it('macro termination', async function () {
 		await diagnosticTester('test-mac-termination.S', [
-			/unmatched end of macro/
+			/unmatched end of macro/,
+			/macro is never referenced in current context/,
 		]);
 	});
 	it('pseudo ops in macro', async function () {
 		await diagnosticTester('test-mac-psops.S', [
+			/macro is never referenced in current context/,
 			/pseudo operation cannot be used/,
 			/pseudo operation cannot be used/,
 			/pseudo operation cannot be used/
@@ -107,8 +112,9 @@ describe('Diagnostics: Macros', function () {
 			await diagnosticTester('test-mac-vars.S', [
 				/macro substitution variable cannot label a line/,
 				/macro substitution variable cannot label a line/,
-				/assembly disabled/,
+				/extension cannot evaluate, assuming true/,
 				/macro substitution variable referenced outside macro/,
+				/macro is never referenced in current context/,
 				/macro substitution variable referenced outside macro/,
 				/macro substitution variable referenced outside macro/
 			]);
@@ -117,8 +123,9 @@ describe('Diagnostics: Macros', function () {
 				/macro substitution variable cannot label a line/,
 				/macro substitution variable cannot label a line/,
 				/argument count cannot label a line/,
-				/assembly disabled/,
+				/extension cannot evaluate, assuming true/,
 				/macro substitution variable referenced outside macro/,
+				/macro is never referenced in current context/,
 				/macro substitution variable referenced outside macro/,
 				/argument count referenced outside macro/,
 				/macro substitution variable referenced outside macro/
@@ -174,6 +181,7 @@ describe('Diagnostics: locals', function () {
 	});
 	it('local in macro', async function () {
 		await diagnosticTester('test-loc-macro.S', [
+			/macro is never referenced in current context/,
 			/cannot use local label/
 		]);
 	});
@@ -217,7 +225,7 @@ describe('Diagnostics: forward', function () {
 			await diagnosticTester('test-ill-fwd.S', [
 				/evaluation was deferred/,
 				/illegal forward reference/,
-				/illegal forward reference/
+				/forward reference check deferred/
 			]);
 	});
 });

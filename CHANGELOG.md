@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2025-02-17
+
+### Fixes
+
+* Docstring is shown when hovering on a macro reference
+* Conditionals are handled more efficiently and accurately
+
+### New Features
+
+* Macro expansions resolve `IF` and `DO` in many cases
+* Unused macro definitions are identified
+* Deferred evaluations in a macro definition are identified
+
+### New Behaviors
+
+* Duplicate labels in a macro are allowed, but a warning is given at `EOM`
+* Conditional macro definitions are handled differently
+    - they are always discouraged by a warning, see the a2kit::lang::merlin docstring
+
 ## [3.2.1] - 2025-01-09
 
 ### Fixes
