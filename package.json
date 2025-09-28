@@ -3,7 +3,7 @@
 	"displayName": "Merlin 6502",
 	"description": "Merlin assembly language for 6502 family of processors",
 	"icon": "language-merlin-icon.png",
-	"version": "3.3.0",
+	"version": "3.4.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -34,6 +34,7 @@
 				"merlin6502.flag.caseSensitive": {
 					"enum": [
 						"ignore",
+						"hint",
 						"info",
 						"warn",
 						"error"
@@ -44,12 +45,79 @@
 				"merlin6502.flag.unclosedFolds": {
 					"enum": [
 						"ignore",
+						"hint",
 						"info",
 						"warn",
 						"error"
 					],
 					"default": "error",
 					"description": "Flag folding ranges that are never closed."
+				},
+				"merlin6502.flag.unusedMacros": {
+					"enum": [
+						"ignore",
+						"hint",
+						"info",
+						"warn",
+						"error"
+					],
+					"default": "warn",
+					"description": "Flag macros that are never referenced."
+				},
+				"merlin6502.flag.unusedMacrosInContext": {
+					"enum": [
+						"ignore",
+						"hint",
+						"info",
+						"warn",
+						"error"
+					],
+					"default": "hint",
+					"description": "Flag macros defined in an include that are not referenced in the selected context."
+				},
+				"merlin6502.flag.unusedLabels": {
+					"enum": [
+						"ignore",
+						"hint",
+						"info",
+						"warn",
+						"error"
+					],
+					"default": "warn",
+					"description": "Flag labels that are never referenced."
+				},
+				"merlin6502.flag.unusedLabelsInContext": {
+					"enum": [
+						"ignore",
+						"hint",
+						"info",
+						"warn",
+						"error"
+					],
+					"default": "hint",
+					"description": "Flag labels defined in an include that are not referenced in the selected context."
+				},
+				"merlin6502.flag.missingEntries": {
+					"enum": [
+						"ignore",
+						"hint",
+						"info",
+						"warn",
+						"error"
+					],
+					"default": "error",
+					"description": "Flag EXT labels for which no ENT is found."
+				},
+				"merlin6502.flag.dupMacLocs": {
+					"enum": [
+						"ignore",
+						"hint",
+						"info",
+						"warn",
+						"error"
+					],
+					"default": "error",
+					"description": "Flag duplicate macro locals."
 				},
 				"merlin6502.columns.c1": {
 					"type": "number",
@@ -131,78 +199,78 @@
 		],
 		"commands": [
 			{
-				"command": "merlin6502.format",
+				"command": "merlin6502.client.format",
 				"title": "merlin6502: Format for copy and paste into Merlin 8"
 			},
 			{
-				"command": "merlin6502.getFrontVii",
+				"command": "merlin6502.client.getFrontVii",
 				"title": "merlin6502: Insert from Virtual ][ front machine"
 			},
 			{
-				"command": "merlin6502.getAppleWinSaveState",
+				"command": "merlin6502.client.getAppleWinSaveState",
 				"title": "merlin6502: Insert from AppleWin save state"
 			},
 			{
-				"command": "merlin6502.getFromDiskImage",
+				"command": "merlin6502.client.getFromDiskImage",
 				"title": "merlin6502: Insert from disk image"
 			},
 			{
-				"command": "merlin6502.saveToDiskImage",
+				"command": "merlin6502.client.saveToDiskImage",
 				"title": "merlin6502: Save to disk image"
 			},
 			{
-				"command": "merlin6502.selectMaster",
+				"command": "merlin6502.client.selectMaster",
 				"title": "merlin6502: Select master file"
 			},
 			{
-				"command": "merlin6502.rescan",
+				"command": "merlin6502.client.rescan",
 				"title": "merlin6502: Rescan modules and includes"
 			},
 			{
-				"command": "merlin6502.toData",
+				"command": "merlin6502.client.toData",
 				"title": "merlin6502: Convert code lines to data lines"
 			},
 			{
-				"command": "merlin6502.toCode",
+				"command": "merlin6502.client.toCode",
 				"title": "merlin6502: Convert data lines to code lines"
 			}
 		],
 		"menus": {
 			"commandPalette": [
 				{
-					"command": "merlin6502.format",
+					"command": "merlin6502.client.format",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.getFrontVii",
+					"command": "merlin6502.client.getFrontVii",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.getAppleWinSaveState",
+					"command": "merlin6502.client.getAppleWinSaveState",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.getFromDiskImage",
+					"command": "merlin6502.client.getFromDiskImage",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.saveToDiskImage",
+					"command": "merlin6502.client.saveToDiskImage",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.selectMaster",
+					"command": "merlin6502.client.selectMaster",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.rescan",
+					"command": "merlin6502.client.rescan",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.toData",
+					"command": "merlin6502.client.toData",
 					"when": "editorLangId == merlin6502"
 				},
 				{
-					"command": "merlin6502.toCode",
+					"command": "merlin6502.client.toCode",
 					"when": "editorLangId == merlin6502"
 				}
 			]

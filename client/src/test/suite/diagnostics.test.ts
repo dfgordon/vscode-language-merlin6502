@@ -70,8 +70,8 @@ describe('Diagnostics: Macros', function () {
 			/macro name matches a mnemonic/,
 			/folding range is never closed/,
 			/folding range is never closed/,
-			/macro is never referenced in current context/,
-			/macro is never referenced in current context/,
+			/macro is never referenced/,
+			/macro is never referenced/,
 		]);
 	});
 	it('undefined macro', async function () {
@@ -88,19 +88,19 @@ describe('Diagnostics: Macros', function () {
 	});
 	it('macro context', async function () {
 		await diagnosticTester('test-mac-context.S', [
-			/macro is never referenced in current context/,
+			/macro is never referenced/,
 			/macro cannot be used here/
 		]);
 	});
 	it('macro termination', async function () {
 		await diagnosticTester('test-mac-termination.S', [
 			/unmatched end of macro/,
-			/macro is never referenced in current context/,
+			/macro is never referenced/,
 		]);
 	});
 	it('pseudo ops in macro', async function () {
 		await diagnosticTester('test-mac-psops.S', [
-			/macro is never referenced in current context/,
+			/macro is never referenced/,
 			/pseudo operation cannot be used/,
 			/pseudo operation cannot be used/,
 			/pseudo operation cannot be used/
@@ -114,7 +114,7 @@ describe('Diagnostics: Macros', function () {
 				/macro substitution variable cannot label a line/,
 				/extension cannot evaluate, assuming true/,
 				/macro substitution variable referenced outside macro/,
-				/macro is never referenced in current context/,
+				/macro is never referenced/,
 				/macro substitution variable referenced outside macro/,
 				/macro substitution variable referenced outside macro/
 			]);
@@ -124,8 +124,9 @@ describe('Diagnostics: Macros', function () {
 				/macro substitution variable cannot label a line/,
 				/argument count cannot label a line/,
 				/extension cannot evaluate, assuming true/,
+				/label is never referenced/, // actually it is, but with differnt meaning
 				/macro substitution variable referenced outside macro/,
-				/macro is never referenced in current context/,
+				/macro is never referenced/,
 				/macro substitution variable referenced outside macro/,
 				/argument count referenced outside macro/,
 				/macro substitution variable referenced outside macro/
@@ -149,19 +150,25 @@ describe('Diagnostics: declarations', function () {
 	});
 	it('undefined local', async function () {
 		await diagnosticTester('test-decs-un-loc.S', [
-			/local label is not defined/
+			/label is never referenced/,
+			/local label is not defined in this scope/
 		]);
 	});
 	it('forward variable', async function () {
 		await diagnosticTester('test-decs-fwd-var.S', [
 			/macro substitution variable cannot label a line/,
-			/variable is forward referenced/
+			/label is never referenced/,
+			/label is never referenced/,
+			/variable is forward referenced/,
+			/label is never referenced/,
 		]);
 	});
 	it('redefinitions', async function () {
 		await diagnosticTester('test-decs-redefined.S', [
 			/redefinition of a global label/,
-			/redefinition of a local label/
+			/redefinition of a local label/,
+			/label is never referenced/,
+			/label is never referenced/,
 		]);
 	});
 });
@@ -169,20 +176,25 @@ describe('Diagnostics: declarations', function () {
 describe('Diagnostics: locals', function () {
 	it('no scope', async function () {
 		await diagnosticTester('test-loc-noscope.S', [
-			/no global scope/
+			/no global scope is defined yet/,
+			/label is never referenced/,
 		]);
 	});
 	it('forbidden pseudo-op', async function () {
 		await diagnosticTester('test-loc-psops.S', [
-			/cannot use local label/,
-			/cannot use local label/,
-			/cannot use local label/
+			/label is never referenced/,
+			/label is never referenced/,
+			/cannot use local label for EQU/,
+			/cannot use local label for ENT/,
+			/label is never referenced/,
+			/cannot use local label for EXT/,
 		]);
 	});
 	it('local in macro', async function () {
 		await diagnosticTester('test-loc-macro.S', [
-			/macro is never referenced in current context/,
-			/cannot use local label/
+			/label is never referenced/,
+			/macro is never referenced/,
+			/cannot use local labels in a macro/,
 		]);
 	});
 });

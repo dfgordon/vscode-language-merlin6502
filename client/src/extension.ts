@@ -84,6 +84,7 @@ export function activate(context: vscode.ExtensionContext)
 		command: serverCommand,
 		//args: ["--log-level","off","--suppress-tokens"],
 		args: ["--log-level","off"],
+		//args: ["--log-level","trace"],
 		transport: vsclnt.TransportKind.stdio
 	};
 	const clientOptions: vsclnt.LanguageClientOptions = {
@@ -99,8 +100,8 @@ export function activate(context: vscode.ExtensionContext)
 			const vstr = client.initializeResult.serverInfo.version;
 			client.outputChannel.appendLine("Server version is " + vstr);
 			const v= vstr.split('.')
-			if (parseInt(v[0]) != 3) {
-				vscode.window.showErrorMessage('Server version is ' + vstr + ', expected 3.x, stopping.');
+			if (parseInt(v[0]) != 4) {
+				vscode.window.showErrorMessage('Server version is ' + vstr + ', expected 4.x, stopping.');
 				client.stop();
 			}
 		} else {
@@ -119,10 +120,10 @@ export function activate(context: vscode.ExtensionContext)
 	typeIndicator.tooltip = "Relationship to other files";
 	contextIndicator.text = "pending";
 	contextIndicator.tooltip = "File defining context of analysis";
-	contextIndicator.command = "merlin6502.selectMaster";
+	contextIndicator.command = "merlin6502.client.selectMaster";
 	rescanButton.text = "rescan";
 	rescanButton.tooltip = "rescan modules and includes";
-	rescanButton.command = "merlin6502.rescan";
+	rescanButton.command = "merlin6502.client.rescan";
 
 	// const highlighter = new tok.SemanticTokensProvider();
 	// highlighter.register();
@@ -140,15 +141,15 @@ export function activate(context: vscode.ExtensionContext)
 		rescanButton.show();
 	}
 
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFrontVii",emulator.getFrontVirtualII,emulator));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getAppleWinSaveState",emulator.getAppleWinSaveState,emulator));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.format",com.showPasteableProgram));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.toData", dasm.toData));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.toCode", dasm.toCode));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.getFromDiskImage", a2kit.getFromImage, a2kit));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.saveToDiskImage", a2kit.putToImage, a2kit));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.selectMaster", masterSelect.selectMaster, masterSelect));
-	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.rescan", rescanner.rescan, rescanner));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.getFrontVii",emulator.getFrontVirtualII,emulator));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.getAppleWinSaveState",emulator.getAppleWinSaveState,emulator));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.format",com.showPasteableProgram));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.toData", dasm.toData));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.toCode", dasm.toCode));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.getFromDiskImage", a2kit.getFromImage, a2kit));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.saveToDiskImage", a2kit.putToImage, a2kit));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.selectMaster", masterSelect.selectMaster, masterSelect));
+	context.subscriptions.push(vscode.commands.registerCommand("merlin6502.client.rescan", rescanner.rescan, rescanner));
 
 	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
 		if (editor?.document.languageId == 'merlin6502') {
