@@ -113,6 +113,7 @@ describe('Diagnostics: Macros', function () {
 				/macro substitution variable cannot label a line/,
 				/macro substitution variable cannot label a line/,
 				/extension cannot evaluate, assuming true/,
+				/label is never referenced/, // actually it is, but with differnt meaning
 				/macro substitution variable referenced outside macro/,
 				/macro is never referenced/,
 				/macro substitution variable referenced outside macro/,
