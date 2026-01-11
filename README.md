@@ -46,7 +46,7 @@ Merlin labels are case sensitive, while instruction and pseudo-instruction mnemo
 
 ## Working with Labels
 
-You can use `Go to Declaration`, `Go to Definition`, `Go to References`, and `Rename Symbol` to find and manipulate labels.  You can also jump to labels using `Ctrl+O` (symbol in document), or `Ctrl+t` (entry labels throughout workspace).  Renaming is scoped to a document, its `PUT` and `USE` includes, and its primary entry labels.
+You can use `Go to Declaration`, `Go to Definition`, `Go to References`, and `Rename Symbol` to find and manipulate labels.  You can also jump to labels using `Ctrl+O` (symbol in document), or `Ctrl+t` (workspace symbols like ENT).  Renaming is scoped to a document, its `PUT` and `USE` includes, and its primary entry labels.
 
 Headings (`*` comments) placed on lines immediately before a label definition are considered docstrings and become part of the hover for that label.  Markdown can be used in the docstrings.
 
@@ -60,7 +60,7 @@ Merlin linker command files are very similar to source files.  The extension wil
 
 ## Linker Modules
 
-The extension will verify that `EXT` and `EXD` labels are declared as `ENT` in another module.  It does not analyze linker command files for consistency, it only verifies that the external label has at least one corresponding entry label *somewhere* in the project.  Hovering over the external label shows the corresponding entries.
+The extension will scan the workspace to establish locations of ENT, EXT, and EXD labels, so that it can provide related diagnostics and hovers.  It does not analyze linker command files for consistency.  Hovering on an EXT label shows the module supplying the ENT and any docstring, while hovering on the ENT shows the modules that use it.
 
 ## PUT and USE files
 

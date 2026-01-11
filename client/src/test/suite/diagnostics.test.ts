@@ -138,6 +138,11 @@ describe('Diagnostics: Macros', function () {
 	});
 	it('macro args', async function () {
 		await diagnosticTester('test-mac-args.S', [
+			/assembly disabled by ELSE/,
+			/argument missing: `]3`/,
+			/argument not used/,
+			/conditionally missing argument: `]2`/,
+			/argument not used/,
 			/uninterpreted literal/
 		]);
 	});

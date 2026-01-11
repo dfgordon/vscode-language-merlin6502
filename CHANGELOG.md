@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-01-11
+
+### Fixes
+
+* Fix an issue with error checking of macro arguments
+
+### New Features
+
+* `Go to references` on an ENT will find the corresponding EXT labels
+* Hovering on an ENT label will show all the modules where it is used
+
+(universal version will skip this update)
+
 ## [3.4.0] - 2025-09-28
 
 ### New Features
