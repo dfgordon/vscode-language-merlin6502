@@ -113,7 +113,8 @@ describe('Diagnostics: Macros', function () {
 				/macro substitution variable cannot label a line/,
 				/macro substitution variable cannot label a line/,
 				/extension cannot evaluate, assuming true/,
-				/label is never referenced/, // actually it is, but with differnt meaning
+				/label is never referenced/, // actually it is, but with different meaning
+				/if this is intentional/,
 				/macro substitution variable referenced outside macro/,
 				/macro is never referenced/,
 				/macro substitution variable referenced outside macro/,
@@ -125,7 +126,8 @@ describe('Diagnostics: Macros', function () {
 				/macro substitution variable cannot label a line/,
 				/argument count cannot label a line/,
 				/extension cannot evaluate, assuming true/,
-				/label is never referenced/, // actually it is, but with differnt meaning
+				/label is never referenced/, // actually it is, but with different meaning
+				/if this is intentional/,
 				/macro substitution variable referenced outside macro/,
 				/macro is never referenced/,
 				/macro substitution variable referenced outside macro/,
@@ -157,6 +159,7 @@ describe('Diagnostics: declarations', function () {
 	it('undefined local', async function () {
 		await diagnosticTester('test-decs-un-loc.S', [
 			/label is never referenced/,
+			/if this is intentional/,
 			/local label is not defined in this scope/
 		]);
 	});
@@ -164,9 +167,12 @@ describe('Diagnostics: declarations', function () {
 		await diagnosticTester('test-decs-fwd-var.S', [
 			/macro substitution variable cannot label a line/,
 			/label is never referenced/,
+			/if this is intentional/,
 			/label is never referenced/,
+			/if this is intentional/,
 			/variable is forward referenced/,
 			/label is never referenced/,
+			/if this is intentional/,
 		]);
 	});
 	it('redefinitions', async function () {
@@ -174,7 +180,9 @@ describe('Diagnostics: declarations', function () {
 			/redefinition of a global label/,
 			/redefinition of a local label/,
 			/label is never referenced/,
+			/if this is intentional/,
 			/label is never referenced/,
+			/if this is intentional/,
 		]);
 	});
 });
@@ -184,21 +192,26 @@ describe('Diagnostics: locals', function () {
 		await diagnosticTester('test-loc-noscope.S', [
 			/no global scope is defined yet/,
 			/label is never referenced/,
+			/if this is intentional/,
 		]);
 	});
 	it('forbidden pseudo-op', async function () {
 		await diagnosticTester('test-loc-psops.S', [
 			/label is never referenced/,
+			/if this is intentional/,
 			/label is never referenced/,
+			/if this is intentional/,
 			/cannot use local label for EQU/,
 			/cannot use local label for ENT/,
 			/label is never referenced/,
+			/if this is intentional/,
 			/cannot use local label for EXT/,
 		]);
 	});
 	it('local in macro', async function () {
 		await diagnosticTester('test-loc-macro.S', [
 			/label is never referenced/,
+			/if this is intentional/,
 			/macro is never referenced/,
 			/cannot use local labels in a macro/,
 		]);
